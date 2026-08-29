@@ -1,4 +1,3 @@
-using System.IO;
 using System.Windows;
 using WinForms = System.Windows.Forms;
 
@@ -14,6 +13,7 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+        AppPaths.EnsureProgramData();
         Theme.LoadAndApply();
 
         var splash = new System.Windows.Window
@@ -36,17 +36,23 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (Paths.FindWorkspaceRoot() is null)
-                throw new DirectoryNotFoundException("找不到工作区（个人管理工具需求.md / nocodb-admin.txt）。");
-
             var status = (System.Windows.Controls.TextBlock)splash.Content;
-            var session = AppSession.Create();
+            var user = ResolveLoginUser(splash);
+            if (user is null)
+            {
+                splash.Close();
+                Shutdown(0);
+                return;
+            }
+
+            status.Text = "正在加载用户「" + user + "」…";
+            var session = AppSession.Create(user);
+            Theme.LoadAndApply();
 
             if (session.Settings.UseNocoBusiness || session.Settings.UseNocoFavorites || session.Settings.UseNocoWeight)
             {
                 status.Text = "正在尝试连接 NocoDB…";
                 await session.TryConnectAsync(msg => Dispatcher.Invoke(() => status.Text = msg));
-                // 连不上也不退出：主窗口里对依赖页灰显
             }
 
             splash.Close();
@@ -65,6 +71,40 @@ public partial class App : System.Windows.Application
                 MessageBoxImage.Error);
             Shutdown(-1);
         }
+    }
+
+    /// <summary>返回要登录的用户名；取消登录则 null。</summary>
+    private static string? ResolveLoginUser(Window splashOwner)
+    {
+        var cfg = ProgramConfig.Load();
+        var users = UserAccounts.ListUsers();
+        var needsMig = LegacyMigrator.NeedsMigration();
+
+        if (!needsMig && cfg.DirectLogin && !string.IsNullOrWhiteSpace(cfg.LastUser)
+            && users.Any(u => u.Equals(cfg.LastUser, StringComparison.OrdinalIgnoreCase)))
+        {
+            var match = users.First(u => u.Equals(cfg.LastUser, StringComparison.OrdinalIgnoreCase));
+            return match;
+        }
+
+        if (!needsMig && cfg.DirectLogin && !string.IsNullOrWhiteSpace(cfg.LastUser)
+            && !users.Any(u => u.Equals(cfg.LastUser, StringComparison.OrdinalIgnoreCase)))
+        {
+            cfg.LastUser = null;
+            cfg.Save();
+        }
+
+        splashOwner.Hide();
+        var login = new LoginWindow();
+        var ok = login.ShowDialog() == true;
+        splashOwner.Show();
+        if (!ok || string.IsNullOrWhiteSpace(login.SelectedUser))
+            return null;
+
+        cfg = ProgramConfig.Load();
+        cfg.LastUser = login.SelectedUser;
+        cfg.Save();
+        return login.SelectedUser;
     }
 
     private void SetupTray(MainWindow main)

@@ -4,6 +4,7 @@ namespace PersonalManagement.Desktop;
 
 internal static class Paths
 {
+    /// <summary>仅用于探测旧工作区（迁移）；正式根见 <see cref="AppPaths.ProjectRoot"/>。</summary>
     public static string? FindWorkspaceRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -11,7 +12,8 @@ internal static class Paths
         {
             if (File.Exists(Path.Combine(dir.FullName, "nocodb-admin.txt"))
                 || File.Exists(Path.Combine(dir.FullName, "个人管理工具需求.md"))
-                || File.Exists(Path.Combine(dir.FullName, "需求.md")))
+                || File.Exists(Path.Combine(dir.FullName, "需求.md"))
+                || Directory.Exists(Path.Combine(dir.FullName, "Personal_Management", "local")))
                 return dir.FullName;
             dir = dir.Parent;
         }
@@ -92,12 +94,12 @@ public sealed class SchemaIds
 public sealed class AppSession
 {
     private readonly object _gate = new();
-    private AdminFile? _fileAdmin;
     private NocoRecordStore? _nocoStore;
     private LocalRecordStore _businessLocal = null!;
     private LocalRecordStore _favoritesLocal = null!;
     private LocalRecordStore _weightLocal = null!;
 
+    public string UserName { get; private set; } = "";
     public StorageSettings Settings { get; private set; } = null!;
     public AdminFile? Admin { get; private set; }
     public bool NocoConnected { get; private set; }
@@ -115,24 +117,22 @@ public sealed class AppSession
     public bool WeightReady => !Settings.UseNocoWeight || NocoConnected;
 
     public string? HoneyViewPath =>
-        FirstNonEmpty(Settings.HoneyView, Admin?.HoneyView, _fileAdmin?.HoneyView);
+        string.IsNullOrWhiteSpace(Settings.HoneyView) ? null : Settings.HoneyView.Trim();
 
-    public static AppSession Create()
+    public static AppSession Create(string userName)
     {
         var session = new AppSession();
-        session.Initialize();
+        session.Initialize(userName);
         return session;
     }
 
-    private void Initialize()
+    private void Initialize(string userName)
     {
+        AppPaths.SetCurrentUser(userName);
+        UserName = userName.Trim();
         Settings = StorageSettings.Load();
-        var root = Paths.FindWorkspaceRoot();
-        if (root is not null)
-            _fileAdmin = AdminFile.TryLoad(Path.Combine(root, "nocodb-admin.txt"));
-
-        try { Admin = Settings.ResolveAdmin(_fileAdmin); }
-        catch { Admin = _fileAdmin; }
+        try { Admin = Settings.ResolveAdmin(); }
+        catch { Admin = null; }
 
         var localRoot = StorageSettings.LocalRoot();
         _businessLocal = new LocalRecordStore(Path.Combine(localRoot, "business"));
@@ -181,7 +181,7 @@ public sealed class AppSession
             AdminFile admin;
             try
             {
-                admin = Settings.ResolveAdmin(_fileAdmin);
+                admin = Settings.ResolveAdmin();
             }
             catch (Exception ex)
             {
@@ -355,14 +355,7 @@ public sealed class AppSession
         Settings.UseNocoFavorites = useFav;
         Settings.UseNocoWeight = useWeight;
         Settings.Save();
-        try { Admin = Settings.ResolveAdmin(_fileAdmin); }
+        try { Admin = Settings.ResolveAdmin(); }
         catch { /* keep previous */ }
-    }
-
-    private static string? FirstNonEmpty(params string?[] values)
-    {
-        foreach (var v in values)
-            if (!string.IsNullOrWhiteSpace(v)) return v.Trim();
-        return null;
     }
 }

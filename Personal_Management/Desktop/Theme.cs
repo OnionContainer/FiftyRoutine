@@ -188,9 +188,9 @@ internal static class Theme
     {
         get
         {
-            var root = Paths.FindWorkspaceRoot();
-            if (root is null) return Path.Combine(AppContext.BaseDirectory, "styles.json");
-            return Path.Combine(root, "Personal_Management", "styles.json");
+            if (AppPaths.CurrentUser is null)
+                return Path.Combine(AppPaths.ProgramDataDir, "_prelogin-styles.json");
+            return Path.Combine(AppPaths.CurrentUserDir, "styles.json");
         }
     }
 
@@ -198,8 +198,9 @@ internal static class Theme
     {
         get
         {
-            var root = Paths.FindWorkspaceRoot() ?? AppContext.BaseDirectory;
-            return Path.Combine(root, "Personal_Management", "Desktop", "Assets", "user");
+            if (AppPaths.CurrentUser is null)
+                return Path.Combine(AppPaths.ProgramDataDir, "assets");
+            return Path.Combine(AppPaths.CurrentUserDir, "assets");
         }
     }
 

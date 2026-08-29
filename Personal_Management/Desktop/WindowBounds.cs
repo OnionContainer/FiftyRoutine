@@ -24,9 +24,9 @@ internal static class WindowBounds
     {
         get
         {
-            var root = Paths.FindWorkspaceRoot();
-            if (root is null) return Path.Combine(AppContext.BaseDirectory, "window.json");
-            return Path.Combine(root, "Personal_Management", "window.json");
+            if (AppPaths.CurrentUser is null)
+                return Path.Combine(AppPaths.ProgramDataDir, "_prelogin-window.json");
+            return Path.Combine(AppPaths.CurrentUserDir, "window.json");
         }
     }
 

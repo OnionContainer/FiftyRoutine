@@ -1892,7 +1892,36 @@ public partial class MainWindow : Window
         if (ConfigHost is null) return;
         ConfigHost.Children.Clear();
         var s = _session.Settings;
-        var admin = _session.Admin;
+        var programCfg = ProgramConfig.Load();
+
+        ConfigHost.Children.Add(new TextBlock
+        {
+            Text = "程序",
+            FontSize = Theme.Current.FontSizeTitle,
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Theme.Brush("TextPrimaryBrush")
+        });
+        ConfigHost.Children.Add(HintBlock(
+            "当前用户：" + _session.UserName + "。关闭「直接登录」后，下次启动会先显示登录页选用户（暂无登出按钮）。"));
+        var directLoginBox = new CheckBox
+        {
+            Content = "直接登录上次用户（程序级，默认开）",
+            IsChecked = programCfg.DirectLogin,
+            Margin = new Thickness(0, 4, 0, 16)
+        };
+        directLoginBox.Checked += (_, _) =>
+        {
+            var cfg = ProgramConfig.Load();
+            cfg.DirectLogin = true;
+            cfg.Save();
+        };
+        directLoginBox.Unchecked += (_, _) =>
+        {
+            var cfg = ProgramConfig.Load();
+            cfg.DirectLogin = false;
+            cfg.Save();
+        };
+        ConfigHost.Children.Add(directLoginBox);
 
         ConfigHost.Children.Add(new TextBlock
         {
@@ -1904,7 +1933,7 @@ public partial class MainWindow : Window
         ConfigHost.Children.Add(HintBlock(
             _session.NocoConnected
                 ? "当前已连接 NocoDB。"
-                : "当前未连接。依赖云端的页会灰显；也可关掉下方开关改用本地。未填项回退到 nocodb-admin.txt。"));
+                : "当前未连接。依赖云端的页会灰显；也可关掉下方开关改用本地。连接信息仅保存在本用户 settings.json，缺项即未配置。"));
 
         var bizBox = new CheckBox
         {
@@ -1928,12 +1957,12 @@ public partial class MainWindow : Window
         ConfigHost.Children.Add(favBox);
         ConfigHost.Children.Add(weightBox);
 
-        var urlBox = FieldBox(s.Url ?? admin?.Url ?? "");
-        var emailBox = FieldBox(s.Email ?? admin?.Email ?? "");
-        var passBox = FieldBox(s.Password ?? admin?.Password ?? "");
-        var tokenBox = FieldBox(s.ApiToken ?? admin?.ApiToken ?? "");
-        var containerBox = FieldBox(s.Container ?? admin?.Container ?? "nocodb-vibecoding");
-        var honeyBox = FieldBox(s.HoneyView ?? admin?.HoneyView ?? "");
+        var urlBox = FieldBox(s.Url ?? "");
+        var emailBox = FieldBox(s.Email ?? "");
+        var passBox = FieldBox(s.Password ?? "");
+        var tokenBox = FieldBox(s.ApiToken ?? "");
+        var containerBox = FieldBox(s.Container ?? "nocodb-vibecoding");
+        var honeyBox = FieldBox(s.HoneyView ?? "");
         var llmKeyBox = FieldBox(s.LlmApiKey ?? "");
         var llmUrlBox = FieldBox(s.LlmBaseUrl ?? "");
         var llmModelBox = FieldBox(s.LlmModel ?? "");

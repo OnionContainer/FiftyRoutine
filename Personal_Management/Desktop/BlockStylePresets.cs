@@ -24,9 +24,9 @@ internal static class BlockStylePresets
     {
         get
         {
-            var root = Paths.FindWorkspaceRoot();
-            if (root is null) return Path.Combine(AppContext.BaseDirectory, "block-style-presets.json");
-            return Path.Combine(root, "Personal_Management", "block-style-presets.json");
+            if (AppPaths.CurrentUser is null)
+                return Path.Combine(AppPaths.ProgramDataDir, "block-style-presets.json");
+            return Path.Combine(AppPaths.CurrentUserDir, "block-style-presets.json");
         }
     }
 

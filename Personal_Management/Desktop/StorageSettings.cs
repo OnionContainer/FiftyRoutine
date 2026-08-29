@@ -12,9 +12,10 @@ public enum NocoConnectMode
 
 public sealed class StorageSettings
 {
-    public bool UseNocoBusiness { get; set; } = true;
-    public bool UseNocoFavorites { get; set; } = true;
-    public bool UseNocoWeight { get; set; } = true;
+    /// <summary>新用户默认全关；迁移自旧文件时保留原值。</summary>
+    public bool UseNocoBusiness { get; set; }
+    public bool UseNocoFavorites { get; set; }
+    public bool UseNocoWeight { get; set; }
     public NocoConnectMode ConnectMode { get; set; } = NocoConnectMode.DockerThenUrl;
     public string? Url { get; set; }
     public string? Email { get; set; }
@@ -28,23 +29,22 @@ public sealed class StorageSettings
 
     public static string FilePath()
     {
-        var root = Paths.FindWorkspaceRoot();
-        return root is null
-            ? Path.Combine(AppContext.BaseDirectory, "storage.json")
-            : Path.Combine(root, "Personal_Management", "storage.json");
+        if (AppPaths.CurrentUser is null)
+            throw new InvalidOperationException("尚未选择用户，无法读写设置。");
+        return Path.Combine(AppPaths.CurrentUserDir, "settings.json");
     }
 
     public static string LocalRoot()
     {
-        var root = Paths.FindWorkspaceRoot();
-        return root is null
-            ? Path.Combine(AppContext.BaseDirectory, "local")
-            : Path.Combine(root, "Personal_Management", "local");
+        if (AppPaths.CurrentUser is null)
+            throw new InvalidOperationException("尚未选择用户，无法访问本地库。");
+        return Path.Combine(AppPaths.CurrentUserDir, "local");
     }
 
-    public static StorageSettings Load()
+    public static StorageSettings Load() => LoadFromFile(FilePath());
+
+    public static StorageSettings LoadFromFile(string path)
     {
-        var path = FilePath();
         if (!File.Exists(path))
             return new StorageSettings();
         try
@@ -53,9 +53,9 @@ public sealed class StorageSettings
             if (node is null) return new StorageSettings();
             return new StorageSettings
             {
-                UseNocoBusiness = node["useNocoBusiness"]?.GetValue<bool>() ?? true,
-                UseNocoFavorites = node["useNocoFavorites"]?.GetValue<bool>() ?? true,
-                UseNocoWeight = node["useNocoWeight"]?.GetValue<bool>() ?? true,
+                UseNocoBusiness = node["useNocoBusiness"]?.GetValue<bool>() ?? false,
+                UseNocoFavorites = node["useNocoFavorites"]?.GetValue<bool>() ?? false,
+                UseNocoWeight = node["useNocoWeight"]?.GetValue<bool>() ?? false,
                 ConnectMode = (NocoConnectMode)(node["connectMode"]?.GetValue<int>() ?? 1),
                 Url = node["url"]?.GetValue<string>(),
                 Email = node["email"]?.GetValue<string>(),
@@ -74,9 +74,10 @@ public sealed class StorageSettings
         }
     }
 
-    public void Save()
+    public void Save() => SaveTo(FilePath());
+
+    public void SaveTo(string path)
     {
-        var path = FilePath();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var obj = new JsonObject
         {
@@ -97,25 +98,26 @@ public sealed class StorageSettings
         File.WriteAllText(path, obj.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 
-    public AdminFile ResolveAdmin(AdminFile? fileFallback)
+    /// <summary>仅使用本用户设置，不再回退 admin txt。</summary>
+    public AdminFile ResolveAdmin()
     {
-        var url = FirstNonEmpty(Url, fileFallback?.Url)
-                  ?? throw new InvalidDataException("未配置 NocoDB URL（设置页或 nocodb-admin.txt）");
-        var email = FirstNonEmpty(Email, fileFallback?.Email)
-                    ?? throw new InvalidDataException("未配置 NocoDB Email");
-        var password = FirstNonEmpty(Password, fileFallback?.Password)
-                       ?? throw new InvalidDataException("未配置 NocoDB Password");
+        var url = string.IsNullOrWhiteSpace(Url)
+            ? throw new InvalidDataException("未配置 NocoDB URL（请在设置页填写）。")
+            : Url.Trim().TrimEnd('/');
+        var email = string.IsNullOrWhiteSpace(Email)
+            ? throw new InvalidDataException("未配置 NocoDB Email。")
+            : Email.Trim();
+        var password = string.IsNullOrWhiteSpace(Password)
+            ? throw new InvalidDataException("未配置 NocoDB Password。")
+            : Password;
         return new AdminFile
         {
-            Url = url.TrimEnd('/'),
+            Url = url,
             Email = email,
             Password = password,
-            ApiToken = FirstNonEmpty(ApiToken, fileFallback?.ApiToken),
-            HoneyView = FirstNonEmpty(HoneyView, fileFallback?.HoneyView),
-            Container = FirstNonEmpty(Container, fileFallback?.Container) ?? "nocodb-vibecoding"
+            ApiToken = string.IsNullOrWhiteSpace(ApiToken) ? null : ApiToken.Trim(),
+            HoneyView = string.IsNullOrWhiteSpace(HoneyView) ? null : HoneyView.Trim(),
+            Container = string.IsNullOrWhiteSpace(Container) ? "nocodb-vibecoding" : Container.Trim()
         };
     }
-
-    private static string? FirstNonEmpty(string? a, string? b) =>
-        !string.IsNullOrWhiteSpace(a) ? a.Trim() : (!string.IsNullOrWhiteSpace(b) ? b.Trim() : null);
 }
