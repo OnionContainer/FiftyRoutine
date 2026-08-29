@@ -122,7 +122,7 @@ internal static class BlockPatterns
         var pat = new SolidColorBrush(Color.FromArgb(255, color.R, color.G, color.B));
         pat.Freeze();
 
-        var drawing = layer.Kind switch
+        var unit = layer.Kind switch
         {
             "sine" => SineTile(pat, spacing, layer.Thickness, layer.Size),
             "stripe" => StripeTile(pat, spacing, layer.Thickness),
@@ -133,19 +133,60 @@ internal static class BlockPatterns
             _ => StripeTile(pat, spacing, layer.Thickness)
         };
 
-        var brush = new DrawingBrush(drawing)
+        Drawing drawing = unit;
+        DrawingBrush brush;
+        if (Math.Abs(layer.CumulativeOffsetX) > 0.01 || Math.Abs(layer.CumulativeOffsetY) > 0.01)
         {
-            TileMode = TileMode.Tile,
-            ViewportUnits = BrushMappingMode.Absolute,
-            Viewport = new Rect(layer.OffsetX, layer.OffsetY, spacing, spacing),
-            Stretch = Stretch.None
-        };
-        if (Math.Abs(layer.Angle) > 0.01)
-        {
-            brush.Transform = new RotateTransform(layer.Angle);
+            drawing = ExpandWithCumulative(unit, spacing, layer.OffsetX, layer.OffsetY,
+                layer.CumulativeOffsetX, layer.CumulativeOffsetY);
+            brush = new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.None,
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top
+            };
         }
+        else
+        {
+            brush = new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewport = new Rect(layer.OffsetX, layer.OffsetY, spacing, spacing),
+                Stretch = Stretch.None
+            };
+        }
+        if (Math.Abs(layer.Angle) > 0.01)
+            brush.Transform = new RotateTransform(layer.Angle);
         brush.Freeze();
         return brush;
+    }
+
+    /// <summary>铺满约 8k DIP：第 n 行 X+=n·cumX，第 n 列 Y+=n·cumY（n 从 1 起）。</summary>
+    private static Drawing ExpandWithCumulative(
+        Drawing unit, double spacing, double offX, double offY, double cumX, double cumY)
+    {
+        const double extent = 8192;
+        var n = (int)Math.Ceiling(extent / spacing) + 2;
+        var g = new DrawingGroup();
+        for (var iy = -1; iy < n; iy++)
+        {
+            for (var ix = -1; ix < n; ix++)
+            {
+                var row = iy + 1; // 1-based when iy=0
+                var col = ix + 1;
+                if (row < 1) row = 1;
+                if (col < 1) col = 1;
+                var x = ix * spacing + offX + row * cumX;
+                var y = iy * spacing + offY + col * cumY;
+                var cell = new DrawingGroup { Transform = new TranslateTransform(x, y) };
+                cell.Children.Add(unit);
+                g.Children.Add(cell);
+            }
+        }
+        g.Freeze();
+        return g;
     }
 
     private static Drawing StripeTile(Brush pat, double spacing, double thickness)

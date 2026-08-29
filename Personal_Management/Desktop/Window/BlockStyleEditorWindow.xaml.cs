@@ -14,9 +14,32 @@ public partial class BlockStyleEditorWindow : Window
     private enum ColorTarget { Base, Layer }
     private ColorTarget _colorTarget = ColorTarget.Base;
     private bool _building;
-    private Slider? _opacity, _thickness, _spacing, _angle, _size, _offX, _offY;
+    private ParamControl? _opacity, _thickness, _spacing, _angle, _size, _offX, _offY, _cumX, _cumY;
     private ComboBox? _kindBox;
     private TextBlock? _paramHint;
+
+    private sealed class ParamControl
+    {
+        public required Slider Slider { get; init; }
+        public required TextBox Box { get; init; }
+        public required double Tick { get; init; }
+
+        public void SetEnabled(bool on)
+        {
+            Slider.IsEnabled = on;
+            Box.IsEnabled = on;
+        }
+
+        public void SetValue(double v, bool syncing)
+        {
+            var clamped = Math.Clamp(v, Slider.Minimum, Slider.Maximum);
+            Slider.Value = clamped;
+            Box.Text = Format(clamped);
+        }
+
+        public string Format(double v) =>
+            v.ToString(Tick < 1 ? "0.##" : "0", CultureInfo.InvariantCulture);
+    }
 
     public BlockStyleEditorWindow(BlockStyleSpec? initial = null)
     {
@@ -169,39 +192,49 @@ public partial class BlockStyleEditorWindow : Window
         };
         ParamHost.Children.Add(_kindBox);
 
-        _opacity = AddSlider("透明度", 0, 1, 0.01, v =>
+        _opacity = AddParam("透明度", 0, 1, 0.01, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].Opacity = v;
             RefreshPreview();
         });
-        _thickness = AddSlider("粗细", 0.5, 32, 0.1, v =>
+        _thickness = AddParam("粗细", 0.5, 32, 0.1, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].Thickness = v;
             RefreshPreview();
         });
-        _spacing = AddSlider("间隔", 2, 64, 0.5, v =>
+        _spacing = AddParam("间隔", 2, 64, 0.5, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].Spacing = v;
             RefreshPreview();
         });
-        _angle = AddSlider("角度", 0, 360, 1, v =>
+        _angle = AddParam("角度", 0, 360, 1, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].Angle = v;
             RefreshPreview();
         });
-        _size = AddSlider("图案尺寸", 0.5, 32, 0.1, v =>
+        _size = AddParam("图案尺寸", 0.5, 32, 0.1, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].Size = v;
             RefreshPreview();
         });
-        _offX = AddSlider("X 重复偏移", -40, 40, 0.5, v =>
+        _offX = AddParam("X 偏移", -40, 40, 0.5, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].OffsetX = v;
             RefreshPreview();
         });
-        _offY = AddSlider("Y 重复偏移", -40, 40, 0.5, v =>
+        _offY = AddParam("Y 偏移", -40, 40, 0.5, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].OffsetY = v;
+            RefreshPreview();
+        });
+        _cumX = AddParam("X 累积偏移", -40, 40, 0.5, v =>
+        {
+            if (_selected >= 0) _spec.Layers[_selected].CumulativeOffsetX = v;
+            RefreshPreview();
+        });
+        _cumY = AddParam("Y 累积偏移", -40, 40, 0.5, v =>
+        {
+            if (_selected >= 0) _spec.Layers[_selected].CumulativeOffsetY = v;
             RefreshPreview();
         });
 
@@ -222,12 +255,17 @@ public partial class BlockStyleEditorWindow : Window
         Foreground = Theme.Brush("TextSecondaryBrush")
     };
 
-    private Slider AddSlider(string label, double min, double max, double tick, Action<double> onChange)
+    private ParamControl AddParam(string label, double min, double max, double tick, Action<double> onChange)
     {
         ParamHost.Children.Add(RowLabel(label));
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-        var val = new TextBlock { Width = 40, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right };
-        DockPanel.SetDock(val, Dock.Right);
+        var box = new TextBox
+        {
+            Width = 52,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        DockPanel.SetDock(box, Dock.Right);
         var slider = new Slider
         {
             Minimum = min,
@@ -236,32 +274,57 @@ public partial class BlockStyleEditorWindow : Window
             IsSnapToTickEnabled = tick >= 1,
             VerticalAlignment = VerticalAlignment.Center
         };
+        var ctrl = new ParamControl { Slider = slider, Box = box, Tick = tick };
         slider.ValueChanged += (_, _) =>
         {
             if (_building) return;
-            val.Text = slider.Value.ToString(tick < 1 ? "0.##" : "0", CultureInfo.InvariantCulture);
+            box.Text = ctrl.Format(slider.Value);
             onChange(slider.Value);
         };
-        row.Children.Add(val);
+        box.LostFocus += (_, _) =>
+        {
+            if (_building) return;
+            if (!double.TryParse(box.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
+                && !double.TryParse(box.Text.Trim(), NumberStyles.Float, CultureInfo.CurrentCulture, out v))
+            {
+                box.Text = ctrl.Format(slider.Value);
+                return;
+            }
+            v = Math.Clamp(v, min, max);
+            _building = true;
+            slider.Value = v;
+            box.Text = ctrl.Format(v);
+            _building = false;
+            onChange(v);
+        };
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                box.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.Next));
+                e.Handled = true;
+            }
+        };
+        row.Children.Add(box);
         row.Children.Add(slider);
         ParamHost.Children.Add(row);
-        return slider;
+        return ctrl;
     }
 
     private void ClearParamEditors()
     {
         _building = true;
         if (_kindBox is not null) _kindBox.IsEnabled = false;
-        SetSlidersEnabled(false);
+        SetParamsEnabled(false);
         if (_paramHint is not null)
             _paramHint.Text = "尚未添加纹样层。可只改底色，或点「添加层」。";
         _building = false;
     }
 
-    private void SetSlidersEnabled(bool on)
+    private void SetParamsEnabled(bool on)
     {
-        foreach (var s in new[] { _opacity, _thickness, _spacing, _angle, _size, _offX, _offY })
-            if (s is not null) s.IsEnabled = on;
+        foreach (var p in new[] { _opacity, _thickness, _spacing, _angle, _size, _offX, _offY, _cumX, _cumY })
+            p?.SetEnabled(on);
         if (_kindBox is not null) _kindBox.IsEnabled = on;
     }
 
@@ -275,7 +338,7 @@ public partial class BlockStyleEditorWindow : Window
         var l = _spec.Layers[_selected];
         l.Normalize();
         _building = true;
-        SetSlidersEnabled(true);
+        SetParamsEnabled(true);
         if (_kindBox is not null)
         {
             foreach (ComboBoxItem item in _kindBox.Items)
@@ -287,21 +350,17 @@ public partial class BlockStyleEditorWindow : Window
                 }
             }
         }
-        SetSlider(_opacity, l.Opacity);
-        SetSlider(_thickness, l.Thickness);
-        SetSlider(_spacing, l.Spacing);
-        SetSlider(_angle, l.Angle);
-        SetSlider(_size, l.Size);
-        SetSlider(_offX, l.OffsetX);
-        SetSlider(_offY, l.OffsetY);
+        _opacity?.SetValue(l.Opacity, true);
+        _thickness?.SetValue(l.Thickness, true);
+        _spacing?.SetValue(l.Spacing, true);
+        _angle?.SetValue(l.Angle, true);
+        _size?.SetValue(l.Size, true);
+        _offX?.SetValue(l.OffsetX, true);
+        _offY?.SetValue(l.OffsetY, true);
+        _cumX?.SetValue(l.CumulativeOffsetX, true);
+        _cumY?.SetValue(l.CumulativeOffsetY, true);
         _building = false;
         UpdateParamHint();
-    }
-
-    private static void SetSlider(Slider? s, double v)
-    {
-        if (s is null) return;
-        s.Value = Math.Clamp(v, s.Minimum, s.Maximum);
     }
 
     private void UpdateParamHint()
@@ -310,10 +369,10 @@ public partial class BlockStyleEditorWindow : Window
         var k = _spec.Layers[_selected].Kind;
         _paramHint.Text = k switch
         {
-            "stripe" => "斜纹：主要用粗细、间隔、角度；尺寸一般不用。",
-            "sine" => "正弦纹路：粗细=线宽，间隔=波长，尺寸=振幅，可调角度。",
-            "diamond" or "star" or "dot" or "moon" => "散布：尺寸=图案大小，间隔=铺贴周期；角度旋转整平铺；偏移移动格子。",
-            _ => "统一参数：透明度、间隔、角度、粗细、尺寸、XY 偏移；不同类型侧重不同字段。"
+            "stripe" => "斜纹：主要用粗细、间隔、角度；尺寸一般不用。偏移=相位；累积偏移=行间错开。",
+            "sine" => "正弦纹路：粗细=线宽，间隔=波长，尺寸=振幅。偏移=相位；累积偏移=行间错开。",
+            "diamond" or "star" or "dot" or "moon" => "散布：尺寸=图案大小，间隔=铺贴周期。偏移移动格子；累积偏移使行/列递增错开。",
+            _ => "统一参数：透明度、间隔、角度、粗细、尺寸、XY 偏移与累积偏移。"
         };
     }
 

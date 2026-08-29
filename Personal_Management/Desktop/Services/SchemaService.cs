@@ -28,6 +28,7 @@ internal static class SchemaService
         await noco.EnsureColumnAsync(tasks, Col("AllowOverflow", "Checkbox"));
         await noco.EnsureColumnAsync(tasks, Col("OverflowSeconds", "Number"));
         await noco.EnsureColumnAsync(tasks, Col("Archived", "Checkbox"));
+        await noco.EnsureColumnAsync(tasks, Col("IsDirectProductivity", "Checkbox"));
         var completions = await noco.EnsureTableAsync(baseId, "completions",
         [
             Col("CompletedOn", "Date")

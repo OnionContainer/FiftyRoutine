@@ -219,7 +219,7 @@ public partial class SchedulePage : UserControl
             {
                 Id = NocoClient.ReadId(node) ?? "",
                 Title = NocoClient.ReadString(node, "Title") ?? "",
-                Type = NocoClient.ReadString(node, "Type") ?? "flexible",
+                Type = NocoClient.ReadString(node, "Type") ?? "daily",
                 RewardLevel = NocoClient.ReadInt(node, "RewardLevel", 1),
                 RegisteredAt = RewardLogic.ParseDate(node, "RegisteredAt"),
                 DueAt = RewardLogic.ParseDate(node, "DueAt"),
@@ -235,7 +235,8 @@ public partial class SchedulePage : UserControl
                 AllowOverflow = NocoClient.ReadBool(node, "AllowOverflow"),
                 OverflowSeconds = Math.Max(0, NocoClient.ReadDouble(node, "OverflowSeconds")),
                 OriginalField = NocoClient.FileField(node, "Original"),
-                CropJson = NocoClient.ReadString(node, "CropJson")
+                CropJson = NocoClient.ReadString(node, "CropJson"),
+                IsDirectProductivity = NocoClient.ReadBool(node, "IsDirectProductivity")
             };
             var dates = completions
                 .Where(c => RewardLogic.LinkedId(c, "Task") == row.Id)
@@ -482,9 +483,15 @@ public partial class SchedulePage : UserControl
                 };
                 ScheduleTip(rect, span.Describe);
                 var sessionId = span.SessionId;
-                rect.MouseLeftButtonDown += (_, e) =>
+                rect.MouseLeftButtonDown += async (_, e) =>
                 {
                     e.Handled = true;
+                    if (e.ClickCount >= 2)
+                    {
+                        if (span.Task is not null)
+                            await EditTaskAsync(span.Task);
+                        return;
+                    }
                     _selectedSessionId = _selectedSessionId == sessionId ? null : sessionId;
                     RenderWeekBoard(_weekStart, _weekSpans);
                 };
@@ -1292,7 +1299,8 @@ public partial class SchedulePage : UserControl
                 ["RewardMinutes"] = dlg.RewardMinutes,
                 ["AllowOverflow"] = dlg.AllowOverflow,
                 ["OverflowSeconds"] = dlg.OverflowSeconds,
-                ["Archived"] = dlg.Archived
+                ["Archived"] = dlg.Archived,
+                ["IsDirectProductivity"] = dlg.IsDirectProductivity
             };
             if (dlg.ClearThumb)
             {
@@ -1539,21 +1547,33 @@ public partial class SchedulePage : UserControl
                 return;
             }
             var now = DateTime.Now;
+            var pick = new RecordDurationWindow(lastEnded.Value, now) { Owner = _host.OwnerWindow };
+            if (pick.ShowDialog() != true) return;
+            DateTime endedAt;
+            if (pick.Choice == RecordDurationWindow.ChoiceKind.UntilNow)
+                endedAt = now;
+            else
+                endedAt = lastEnded.Value.AddMinutes(pick.Minutes);
+            if (endedAt > now)
+            {
+                MessageBox.Show("结束时间不能超过现在。");
+                return;
+            }
             await _host.Session.Business.CreateRecordAsync(StoreTables.Sessions, new Dictionary<string, object?>
             {
                 ["Title"] = task.Title,
                 ["StartedAt"] = RewardLogic.FormatDateTime(lastEnded.Value),
-                ["EndedAt"] = RewardLogic.FormatDateTime(now),
+                ["EndedAt"] = RewardLogic.FormatDateTime(endedAt),
                 ["Outcome"] = "success",
                 ["PausedSeconds"] = 0,
                 ["PauseJson"] = SessionLogic.SerializePauses([]),
                 ["Task"] = task.Id
             });
-            var active = SessionLogic.ActiveSeconds(lastEnded.Value, now, 0);
+            var active = SessionLogic.ActiveSeconds(lastEnded.Value, endedAt, 0);
             await SettleSuccessAsync(task.Id, task.Title, active);
             await LoadTasksAsync();
             await LoadWeekAsync();
-            MaybeWarnHiddenHours(task.Title, lastEnded.Value, now);
+            MaybeWarnHiddenHours(task.Title, lastEnded.Value, endedAt);
         }
         catch (Exception ex)
         {
@@ -1862,7 +1882,8 @@ public partial class SchedulePage : UserControl
                 ["RewardMinutes"] = dlg.RewardMinutes,
                 ["AllowOverflow"] = dlg.AllowOverflow,
                 ["OverflowSeconds"] = dlg.OverflowSeconds,
-                ["Archived"] = dlg.Archived
+                ["Archived"] = dlg.Archived,
+                ["IsDirectProductivity"] = dlg.IsDirectProductivity
             };
             if (dlg.ThumbPath is not null)
                 fields["Thumb"] = await _host.Session.Business.UploadAsync(System.IO.Path.GetFileName(dlg.ThumbPath), await File.ReadAllBytesAsync(dlg.ThumbPath), MimeOf(dlg.ThumbPath));

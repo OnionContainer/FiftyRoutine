@@ -74,8 +74,13 @@ public sealed class BlockStyleLayer
     public double Angle { get; set; } = 45;
     /// <summary>图案尺寸：散布半径/半宽；正弦振幅。</summary>
     public double Size { get; set; } = 3.5;
+    /// <summary>整体相位偏移（原「重复偏移」）。</summary>
     public double OffsetX { get; set; }
     public double OffsetY { get; set; }
+    /// <summary>第 n 行（1-based）额外 X 偏移 = n · CumulativeOffsetX。</summary>
+    public double CumulativeOffsetX { get; set; }
+    /// <summary>第 n 列（1-based）额外 Y 偏移 = n · CumulativeOffsetY。</summary>
+    public double CumulativeOffsetY { get; set; }
 
     public BlockStyleLayer Clone() => new()
     {
@@ -87,7 +92,9 @@ public sealed class BlockStyleLayer
         Angle = Angle,
         Size = Size,
         OffsetX = OffsetX,
-        OffsetY = OffsetY
+        OffsetY = OffsetY,
+        CumulativeOffsetX = CumulativeOffsetX,
+        CumulativeOffsetY = CumulativeOffsetY
     };
 
     public void Normalize()
@@ -102,6 +109,8 @@ public sealed class BlockStyleLayer
         Size = Math.Clamp(Size, 0.5, 64);
         OffsetX = Math.Clamp(OffsetX, -256, 256);
         OffsetY = Math.Clamp(OffsetY, -256, 256);
+        CumulativeOffsetX = Math.Clamp(CumulativeOffsetX, -128, 128);
+        CumulativeOffsetY = Math.Clamp(CumulativeOffsetY, -128, 128);
     }
 
     public static string NormalizeKind(string? kind)

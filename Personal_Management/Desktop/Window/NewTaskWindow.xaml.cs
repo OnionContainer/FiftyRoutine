@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace PersonalManagement.Desktop;
@@ -8,7 +7,7 @@ namespace PersonalManagement.Desktop;
 public partial class NewTaskWindow : Window
 {
     public string TaskTitle { get; private set; } = "";
-    public string TaskType { get; private set; } = "flexible";
+    public string TaskType { get; private set; } = "daily";
     public int RewardLevel { get; private set; } = 1;
     public DateTime? DueAt { get; private set; }
     public DateTime? ReminderAt { get; private set; }
@@ -24,14 +23,12 @@ public partial class NewTaskWindow : Window
     public int RewardMinutes { get; private set; } = 30;
     public bool AllowOverflow { get; private set; }
     public bool Archived { get; private set; }
+    public bool IsDirectProductivity { get; private set; }
     public double OverflowSeconds { get; private set; }
 
     private int _originalMinutes = 30;
     private bool _originalAllow;
     private double _originalOverflow;
-    private bool _patternUiReady;
-    /// <summary>程序化改 PatternBox 时不覆盖 BlockStyleJson（否则高级编辑结果会被 FromLegacy 冲掉）。</summary>
-    private bool _syncingPatternUi;
 
     public NewTaskWindow()
     {
@@ -43,10 +40,6 @@ public partial class NewTaskWindow : Window
         for (var i = 0; i <= 5; i++)
             LevelBox.Items.Add(new ComboBoxItem { Content = i == 0 ? "L0 无奖励" : "L" + i, Tag = i });
         SelectLevel(1);
-        foreach (var (id, label) in BlockPatterns.All)
-            PatternBox.Items.Add(new ComboBoxItem { Content = label, Tag = id });
-        SelectPattern(BlockPatterns.None);
-        _patternUiReady = true;
         RefreshBlockVisuals();
     }
 
@@ -84,13 +77,13 @@ public partial class NewTaskWindow : Window
             ? BlockPatterns.DefaultPatternColor
             : task.BlockPatternColor;
         BlockStyleJson = task.BlockStyleJson;
-        SelectPattern(BlockPattern);
         RefreshBlockVisuals();
         DueBox.Text = task.DueAt?.ToString("yyyy-MM-dd HH:mm") ?? "";
         RemindBox.Text = task.ReminderAt?.ToString("yyyy-MM-dd HH:mm") ?? "";
         MinutesBox.Text = task.RewardMinutes.ToString();
         OverflowBox.IsChecked = task.AllowOverflow;
         ArchivedBox.IsChecked = task.Archived;
+        ProductivityBox.IsChecked = task.IsDirectProductivity;
         _originalMinutes = task.RewardMinutes;
         _originalAllow = task.AllowOverflow;
         _originalOverflow = task.OverflowSeconds;
@@ -114,32 +107,8 @@ public partial class NewTaskWindow : Window
         }
     }
 
-    private void SelectPattern(string id)
-    {
-        var want = BlockPatterns.Normalize(id);
-        _syncingPatternUi = true;
-        try
-        {
-            foreach (ComboBoxItem item in PatternBox.Items)
-            {
-                if ((item.Tag as string) == want)
-                {
-                    PatternBox.SelectedItem = item;
-                    return;
-                }
-            }
-            PatternBox.SelectedIndex = 0;
-        }
-        finally
-        {
-            _syncingPatternUi = false;
-        }
-    }
-
     private void RefreshBlockVisuals()
     {
-        ColorSwatch.Background = TaskVisual.BrushOf(ColorHex);
-        PatternColorSwatch.Background = TaskVisual.BrushOf(BlockPatternColor);
         var spec = BlockStyleSpec.FromJson(BlockStyleJson)
                    ?? BlockStyleSpec.FromLegacy(ColorHex, BlockPattern, BlockPatternColor);
         spec.BaseColor = ColorHex;
@@ -177,17 +146,6 @@ public partial class NewTaskWindow : Window
                 _ => BlockPatterns.None
             };
         }
-        SelectPattern(BlockPattern);
-        RefreshBlockVisuals();
-    }
-
-    private void Pattern_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_patternUiReady || _syncingPatternUi) return;
-        BlockPattern = BlockPatterns.Normalize((PatternBox.SelectedItem as ComboBoxItem)?.Tag as string);
-        // 仅用户改简易下拉时，用旧单层覆盖 JSON；高级编辑写回后的同步不得走这里
-        var spec = BlockStyleSpec.FromLegacy(ColorHex, BlockPattern, BlockPatternColor);
-        BlockStyleJson = spec.Layers.Count == 0 ? null : spec.ToJson();
         RefreshBlockVisuals();
     }
 
@@ -196,38 +154,6 @@ public partial class NewTaskWindow : Window
         var id = (TypeBox.SelectedItem as ComboBoxItem)?.Tag as string;
         LevelBox.IsEnabled = id != "daily";
         if (id == "daily") SelectLevel(1);
-    }
-
-    private void PickColor_Click(object sender, RoutedEventArgs e)
-    {
-        using var dlg = new System.Windows.Forms.ColorDialog { FullOpen = true };
-        var current = TaskVisual.ParseColor(ColorHex);
-        dlg.Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B);
-        if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        ColorHex = $"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}";
-        if (BlockStyleSpec.FromJson(BlockStyleJson) is { } spec)
-        {
-            spec.BaseColor = ColorHex;
-            BlockStyleJson = spec.ToJson();
-        }
-        RefreshBlockVisuals();
-    }
-
-    private void PickPatternColor_Click(object sender, RoutedEventArgs e)
-    {
-        using var dlg = new System.Windows.Forms.ColorDialog { FullOpen = true };
-        var current = TaskVisual.ParseColor(BlockPatternColor);
-        dlg.Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B);
-        if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        BlockPatternColor = $"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}";
-        var spec = BlockStyleSpec.FromJson(BlockStyleJson)
-                   ?? BlockStyleSpec.FromLegacy(ColorHex, BlockPattern, BlockPatternColor);
-        if (spec.Layers.Count > 0)
-            spec.Layers[0].Color = BlockPatternColor;
-        else if (BlockPattern != BlockPatterns.None)
-            spec = BlockStyleSpec.FromLegacy(ColorHex, BlockPattern, BlockPatternColor);
-        BlockStyleJson = spec.Layers.Count == 0 ? null : spec.ToJson();
-        RefreshBlockVisuals();
     }
 
     private void ClearThumb_Click(object sender, RoutedEventArgs e)
@@ -273,14 +199,6 @@ public partial class NewTaskWindow : Window
         UpdateClearThumbEnabled();
     }
 
-    private void SetThumb(string path)
-    {
-        ClearThumb = false;
-        ThumbPath = path;
-        ThumbPreview.Source = FavoriteService.LoadLocalPreview(path, 96);
-        UpdateClearThumbEnabled();
-    }
-
     internal void PrefillCropState(string? originalPath, string? cropJson)
     {
         OriginalPath = originalPath;
@@ -316,25 +234,15 @@ public partial class NewTaskWindow : Window
         }
         if (!allow) overflow = 0;
         TaskTitle = TitleBox.Text.Trim();
-        TaskType = (TypeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "flexible";
+        TaskType = (TypeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "daily";
         RewardLevel = (LevelBox.SelectedItem as ComboBoxItem)?.Tag is int n ? n : 1;
         if (TaskType == "daily") RewardLevel = 1;
-        BlockPattern = BlockPatterns.Normalize((PatternBox.SelectedItem as ComboBoxItem)?.Tag as string);
         DueAt = ParseOptional(DueBox.Text);
         ReminderAt = ParseOptional(RemindBox.Text);
-        if (DueBox.Text.Trim().Length > 0 && DueAt is null)
-        {
-            MessageBox.Show("截止时间格式不对。");
-            return;
-        }
-        if (RemindBox.Text.Trim().Length > 0 && ReminderAt is null)
-        {
-            MessageBox.Show("提醒时间格式不对。");
-            return;
-        }
         RewardMinutes = minutes;
         AllowOverflow = allow;
         Archived = ArchivedBox.IsChecked == true;
+        IsDirectProductivity = ProductivityBox.IsChecked == true;
         OverflowSeconds = overflow;
         DialogResult = true;
         Close();

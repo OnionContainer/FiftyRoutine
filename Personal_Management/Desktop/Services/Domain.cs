@@ -58,6 +58,8 @@ internal sealed class TaskRow
     public int RewardMinutes { get; set; } = 30;
     public bool AllowOverflow { get; set; }
     public double OverflowSeconds { get; set; }
+    /// <summary>直接生产力任务：用于日后统计每日有效执行。</summary>
+    public bool IsDirectProductivity { get; set; }
     public string Status => Running ? "执行中" : DoneToday && (Type is "daily" or "flexible_repeat") ? "今日已完成" : "";
     public string LevelLabel => "L" + RewardLevel;
     public System.Windows.Media.Color CardColor => TaskVisual.ParseColor(ColorHex);
@@ -68,8 +70,6 @@ internal static class TaskKinds
     public static readonly (string Id, string Label)[] All =
     [
         ("daily", "每日重复"),
-        ("deadline", "截止型"),
-        ("flexible", "灵活型"),
         ("flexible_repeat", "灵活重复")
     ];
 }
