@@ -1,0 +1,68 @@
+<Window x:Class="PersonalManagement.Desktop.RewardWishWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="奖励 / 愿望单" Width="900" Height="700"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="True"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <DockPanel>
+        <WrapPanel DockPanel.Dock="Top" Background="{DynamicResource SurfaceBackgroundBrush}" Margin="0,0,0,4">
+            <TextBlock x:Name="WalletText" Text="当前奖券数量：0 · 愿望单额度：0"
+                       VerticalAlignment="Center" Margin="8,4,8,4"
+                       FontWeight="SemiBold" Cursor="Hand"
+                       ToolTip="点击调整奖券数量 / 愿望单额度"
+                       MouseLeftButtonUp="WalletText_Click"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <TextBlock Text="F5 刷新" VerticalAlignment="Center" Margin="12,0,8,4"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="12,0,8,4"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </WrapPanel>
+        <Grid>
+            <DockPanel x:Name="ContentRoot">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel x:Name="RewardDock" Grid.Row="0">
+                        <WrapPanel DockPanel.Dock="Top" Background="{DynamicResource SurfaceBackgroundBrush}" Margin="0,0,0,4">
+                            <Button Content="添加" Click="AddReward_Click"/>
+                            <Button Content="抽一次" Click="Draw_Click"/>
+                            <CheckBox x:Name="RewardArchivedBox" Content="显示已归档内容" VerticalAlignment="Center"
+                                      Checked="RewardArchived_Changed" Unchecked="RewardArchived_Changed"/>
+                            <TextBlock x:Name="DrawResult" VerticalAlignment="Center" Margin="8,0,8,4"
+                                       FontSize="{DynamicResource FontSizeTitle}"/>
+                        </WrapPanel>
+                        <ScrollViewer x:Name="RewardScroll" VerticalScrollBarVisibility="Auto">
+                            <WrapPanel x:Name="RewardWrap" Margin="8"/>
+                        </ScrollViewer>
+                    </DockPanel>
+                    <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch" ResizeDirection="Rows" ShowsPreview="True"
+                                  Background="{DynamicResource BorderSubtleBrush}"/>
+                    <DockPanel x:Name="WishDock" Grid.Row="2">
+                        <WrapPanel DockPanel.Dock="Top" Background="{DynamicResource SurfaceBackgroundBrush}" Margin="0,0,0,4">
+                            <Button Content="添加" Click="AddWish_Click"/>
+                            <Button Content="兑换所选" Click="Redeem_Click"/>
+                            <CheckBox x:Name="WishArchivedBox" Content="显示已归档内容" VerticalAlignment="Center"
+                                      Checked="WishArchived_Changed" Unchecked="WishArchived_Changed"/>
+                        </WrapPanel>
+                        <ScrollViewer x:Name="WishScroll" VerticalScrollBarVisibility="Auto">
+                            <WrapPanel x:Name="WishWrap" Margin="8"/>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Grid>
+            </DockPanel>
+            <Border x:Name="OfflineOverlay" Visibility="Collapsed" Background="#CCFFFFFF" Panel.ZIndex="20">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
+                    <TextBlock Text="NocoDB未连接，请配置NocoDB或将此页面功能设为不依赖NocoDB后重试"
+                               TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,12"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <Button Content="尝试连接 NocoDB" HorizontalAlignment="Center" Click="TryConnectNoco_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

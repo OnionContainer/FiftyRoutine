@@ -1,0 +1,61 @@
+# --- Secrets / credentials ---
+nocodb-admin.txt
+password.md
+.env
+*.env
+*.pem
+*.key
+credentials.json
+**/appsettings.*.local.json
+
+# --- Local experiments (not part of the product repo) ---
+Painting_API_Study/
+painting_api_study.md
+
+# --- Local runtime data (machine-specific) ---
+nocodb-data/
+Personal_Management/local/
+Personal_Management/storage.json
+Personal_Management/styles.json
+Personal_Management/window.json
+Personal_Management/block-style-presets.json
+Personal_Management/Desktop/Assets/user/
+
+# --- App / playground local state ---
+playground/last-settings.json
+playground/**/last-settings.json
+*.pmimg
+
+# --- .NET build ---
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg
+
+# --- IDE / OS ---
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# --- Temp / probes scratch ---
+**/_tmp_*
+*.tmp
+*.temp
+*.log

@@ -1,0 +1,59 @@
+<Window x:Class="Playground.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="波形测试" Height="480" Width="640"
+        WindowStartupLocation="CenterScreen"
+        MinHeight="360" MinWidth="560">
+    <DockPanel Margin="16">
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text=""/>
+            </StatusBarItem>
+        </StatusBar>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,8">
+            <TextBlock Text="时长（秒）" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox x:Name="DurationBox" Width="64" Text="1.2" VerticalAlignment="Center"
+                     TextChanged="DurationBox_TextChanged"/>
+            <Button Content="播放" Width="72" Margin="16,0,8,0" Click="Play_Click"/>
+            <Button Content="停止" Width="72" Click="Stop_Click"/>
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <ItemsControl x:Name="WaveList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,0,0,8" LastChildFill="True">
+                                <Button DockPanel.Dock="Left" Content="−" Width="32" Height="28" Margin="0,0,8,0"
+                                        Click="Remove_Click" Tag="{Binding}"
+                                        ToolTip="删除这个波形"/>
+                                <UniformGrid Columns="3">
+                                    <DockPanel Margin="0,0,8,0">
+                                        <TextBlock DockPanel.Dock="Top" Text="波形" Opacity="0.7"/>
+                                        <ComboBox ItemsSource="{Binding DataContext.WaveTypes, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValuePath="Type"
+                                                  SelectedValue="{Binding Type, Mode=TwoWay}"
+                                                  Margin="0,4,0,0"/>
+                                    </DockPanel>
+                                    <DockPanel Margin="0,0,8,0">
+                                        <TextBlock DockPanel.Dock="Top" Text="频率 Hz" Opacity="0.7"/>
+                                        <TextBox Text="{Binding Frequency, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding FrequencyEnabled}"
+                                                 Margin="0,4,0,0"/>
+                                    </DockPanel>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="音量 0–1" Opacity="0.7"/>
+                                        <TextBox Text="{Binding Gain, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,4,0,0"/>
+                                    </DockPanel>
+                                </UniformGrid>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="+" Width="32" Height="28" HorizontalAlignment="Left"
+                        Click="Add_Click" ToolTip="再加一个波形一起混音"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

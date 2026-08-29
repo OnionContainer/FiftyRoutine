@@ -1,0 +1,25 @@
+<Window x:Class="PersonalManagement.Desktop.TaskRunWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="任务执行" Height="280" Width="420"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+    <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="PauseButton" Content="暂停" Width="88" Height="32" Margin="0,0,8,0"
+                    VerticalAlignment="Center" Click="Pause_Click"/>
+            <Button Content="失败" Width="88" Height="32" Margin="0,0,8,0" VerticalAlignment="Center"
+                    Click="Fail_Click" Foreground="{DynamicResource DangerBrush}"/>
+            <Button Content="退出" Width="88" Height="32" Margin="0" VerticalAlignment="Center"
+                    IsDefault="True" Click="Success_Click"/>
+        </StackPanel>
+        <StackPanel>
+            <TextBlock x:Name="TitleText" FontSize="{DynamicResource FontSizeTitle}" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ClockText" Margin="0,16,0,8" FontSize="{DynamicResource FontSizeTitle}"/>
+            <ProgressBar x:Name="Bar" Height="18" Minimum="0" Maximum="1800"/>
+            <TextBlock x:Name="HintText" Margin="0,12,0,0" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Text="满 30 分钟不会自动停下，只会提醒。暂停的时间不计入执行时长。"/>
+        </StackPanel>
+    </DockPanel>
+</Window>

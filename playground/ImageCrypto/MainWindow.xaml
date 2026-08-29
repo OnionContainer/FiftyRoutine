@@ -1,0 +1,48 @@
+<Window x:Class="Playground.ImageCrypto.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="图片加密验证" Height="520" Width="780"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel Margin="12">
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="选一张图，设密码，加密；再用同一密码打开 .pmimg 解密核对。"/>
+            </StatusBarItem>
+        </StatusBar>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="密码" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <PasswordBox x:Name="PinBox" Width="200" VerticalAlignment="Center"/>
+                <Button Content="选图加密…" Margin="16,0,0,0" Click="Encrypt_Click"/>
+                <Button Content="打开密文解密…" Margin="8,0,0,0" Click="Decrypt_Click"/>
+                <Button Content="导出解密图…" Margin="8,0,0,0" Click="Export_Click"/>
+            </StackPanel>
+            <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#555"
+                       Text="算法：PBKDF2-SHA256（200k）+ AES-GCM。密文后缀 .pmimg。解密失败会明确提示密码错或文件被改。"/>
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border BorderBrush="#CCC" BorderThickness="1" Padding="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="原图 / 待加密" Margin="0,0,0,4"/>
+                        <Image x:Name="SrcPreview" Stretch="Uniform"/>
+                    </DockPanel>
+                </Border>
+                <Border Grid.Column="2" BorderBrush="#CCC" BorderThickness="1" Padding="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="解密结果" Margin="0,0,0,4"/>
+                        <Image x:Name="DecPreview" Stretch="Uniform"/>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>

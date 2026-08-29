@@ -1,0 +1,78 @@
+<Window x:Class="PersonalManagement.Desktop.BlockStyleEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PersonalManagement.Desktop"
+        Title="日程记录块样式"
+        Height="640" Width="980"
+        WindowStartupLocation="CenterScreen"
+        MinWidth="800" MinHeight="520">
+    <DockPanel Margin="12">
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="False">
+            <TextBlock x:Name="HintText" DockPanel.Dock="Left" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" MaxWidth="560"
+                       Text="先点「底色」或「层颜色」激活取色目标，再在右侧色环/三角上点击或拖动，预览即时更新。"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="取消" Width="88" Height="32" Margin="0,0,8,0" Click="Cancel_Click"/>
+                <Button Content="确定" Width="88" Height="32" IsDefault="True" Click="Ok_Click"/>
+            </StackPanel>
+        </DockPanel>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*"/>
+                <ColumnDefinition Width="1.2*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 预览 -->
+            <DockPanel Grid.Column="0" Margin="0,0,10,0">
+                <TextBlock DockPanel.Dock="Top" Text="预览" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                        Background="{DynamicResource WeekColumnBackgroundBrush}" Padding="12" Margin="0,0,0,12">
+                    <Border x:Name="PreviewHost" Height="120" CornerRadius="4" ClipToBounds="True"
+                            HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock DockPanel.Dock="Top" Text="预设" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ComboBox x:Name="PresetBox" DockPanel.Dock="Top" Margin="0,0,0,8"
+                          DisplayMemberPath="Name"/>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                    <Button Content="应用" Width="56" Height="28" Click="ApplyPreset_Click" Margin="0,0,6,0"
+                            ToolTip="把所选预设载入当前编辑"/>
+                    <Button Content="存为预设" Width="72" Height="28" Click="SavePreset_Click" Margin="0,0,6,0"
+                            ToolTip="将当前配置保存为预设（同名覆盖）"/>
+                    <Button Content="删除预设" Width="72" Height="28" Click="DeletePreset_Click"
+                            ToolTip="删除下拉中选中的预设"/>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- 层列表与参数 -->
+            <DockPanel Grid.Column="1" Margin="0,0,10,0">
+                <TextBlock DockPanel.Dock="Top" Text="纹样层" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Content="添加层" Width="72" Height="28" Click="AddLayer_Click" Margin="0,0,6,0"/>
+                    <Button Content="删除层" Width="72" Height="28" Click="RemoveLayer_Click" Margin="0,0,6,0"/>
+                    <Button Content="上移" Width="52" Height="28" Click="MoveUp_Click" Margin="0,0,6,0"/>
+                    <Button Content="下移" Width="52" Height="28" Click="MoveDown_Click"/>
+                </StackPanel>
+                <ListBox x:Name="LayerList" DockPanel.Dock="Top" Height="100" Margin="0,0,0,8"
+                         SelectionChanged="LayerList_SelectionChanged"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="ParamHost"/>
+                </ScrollViewer>
+            </DockPanel>
+
+            <!-- 取色 -->
+            <DockPanel Grid.Column="2" Width="250">
+                <TextBlock DockPanel.Dock="Top" Text="取色" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button x:Name="TargetBaseBtn" Content="底色" Width="72" Height="28" Margin="0,0,6,0" Click="TargetBase_Click"/>
+                    <Button x:Name="TargetLayerBtn" Content="层颜色" Width="72" Height="28" Click="TargetLayer_Click"/>
+                </StackPanel>
+                <Border DockPanel.Dock="Top" x:Name="ActiveSwatch" Height="28" Margin="0,0,0,8"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"/>
+                <local:HlsColorPicker x:Name="HlsPicker" Width="220" Height="220"
+                                      HorizontalAlignment="Left"/>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>
