@@ -1,0 +1,32 @@
+<Window x:Class="PersonalManagement.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PersonalManagement.Desktop"
+        Title="个人管理" Height="640" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <DockPanel>
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="StatusText" Text=""/>
+            </StatusBarItem>
+        </StatusBar>
+        <TabControl x:Name="MainTabs" Margin="8">
+            <TabItem x:Name="WeekTab" Header="日程记录">
+                <local:SchedulePage x:Name="SchedulePageHost"/>
+            </TabItem>
+            <TabItem x:Name="FavTab" Header="收藏夹">
+                <local:FavoritesPage x:Name="FavoritesPageHost"/>
+            </TabItem>
+            <TabItem x:Name="WeightTab" Header="体重">
+                <local:WeightPage x:Name="WeightPageHost"/>
+            </TabItem>
+            <TabItem Header="界面">
+                <local:AppearancePage x:Name="AppearancePageHost"/>
+            </TabItem>
+            <TabItem Header="设置">
+                <local:SettingsPage x:Name="SettingsPageHost"/>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

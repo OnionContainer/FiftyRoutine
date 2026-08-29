@@ -1,0 +1,33 @@
+<UserControl x:Class="PersonalManagement.Desktop.FavoritesPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Grid>
+                <DockPanel x:Name="FavDock" AllowDrop="True" Background="Transparent"
+                           PreviewDragOver="FavDock_PreviewDragOver"
+                           Drop="FavDock_Drop">
+                    <WrapPanel DockPanel.Dock="Top" Background="{DynamicResource SurfaceBackgroundBrush}" Margin="0,0,0,4">
+                        <Button Content="添加" Click="AddFavorite_Click"/>
+                        <Button Content="复制图片" Click="CopyFavorite_Click"/>
+                        <Button Content="HoneyView" Click="HoneyViewFavorite_Click"/>
+                        <Button Content="导出所选" Click="ExportFavorites_Click"/>
+                        <TextBlock Text="标签" VerticalAlignment="Center" Margin="8,0,4,4"/>
+                        <ComboBox x:Name="FavTagBox" Width="140" SelectionChanged="FavTagBox_Changed"/>
+                        <CheckBox x:Name="FavPrivateBox" Content="显示私密 tag" VerticalAlignment="Center"
+                                  Checked="FavPrivate_Checked" Unchecked="FavPrivate_Unchecked"/>
+                        <TextBlock Text="拖入图片或 Ctrl+V · F5 刷新" VerticalAlignment="Center" Margin="8,0,8,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </WrapPanel>
+                    <ScrollViewer x:Name="FavScroll" VerticalScrollBarVisibility="Auto" SizeChanged="CardHost_SizeChanged">
+                        <WrapPanel x:Name="FavWrap" Margin="8"/>
+                    </ScrollViewer>
+                </DockPanel>
+                <Border x:Name="FavOfflineOverlay" Visibility="Collapsed" Background="#CCFFFFFF" Panel.ZIndex="20">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
+                        <TextBlock Text="NocoDB未连接，请配置NocoDB或将此页面功能设为不依赖NocoDB后重试"
+                                   TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,12"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <Button Content="尝试连接 NocoDB" HorizontalAlignment="Center" Click="TryConnectNoco_Click"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+</UserControl>

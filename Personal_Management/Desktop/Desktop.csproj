@@ -21,6 +21,10 @@
     <InternalsVisibleTo Include="Probes" />
   </ItemGroup>
   <ItemGroup>
+    <ApplicationDefinition Include="App\App.xaml" />
+    <Page Remove="App\App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="Assets\start-task.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
