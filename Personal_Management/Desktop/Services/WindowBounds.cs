@@ -19,6 +19,9 @@ internal static class WindowBounds
     private static Window? _target;
     private static int _taskRailColumns = 1;
     private static bool _suppressHiddenHourTip;
+    private static bool _scheduleStatsExpanded;
+    private static double _scheduleStatsHeight = 240;
+    private static int _scheduleStatsDays = 14;
 
     public static string FilePath
     {
@@ -36,10 +39,46 @@ internal static class WindowBounds
     /// <summary>是否不再提示「日程块落在未显示时间」。</summary>
     public static bool SuppressHiddenHourTip => _suppressHiddenHourTip;
 
+    public static bool ScheduleStatsExpanded => _scheduleStatsExpanded;
+    public static double ScheduleStatsHeight => Math.Clamp(_scheduleStatsHeight, 120, 600);
+    public static int ScheduleStatsDays => _scheduleStatsDays is 7 or 30 ? _scheduleStatsDays : 14;
+
     public static void SetSuppressHiddenHourTip(bool value)
     {
         if (_suppressHiddenHourTip == value) return;
         _suppressHiddenHourTip = value;
+        if (_target is not null)
+            ScheduleSave(_target);
+        else
+            PersistLayoutOnly();
+    }
+
+    public static void SetScheduleStatsExpanded(bool expanded)
+    {
+        if (_scheduleStatsExpanded == expanded) return;
+        _scheduleStatsExpanded = expanded;
+        if (_target is not null)
+            ScheduleSave(_target);
+        else
+            PersistLayoutOnly();
+    }
+
+    public static void SetScheduleStatsHeight(double height)
+    {
+        var next = Math.Clamp(height, 120, 600);
+        if (Math.Abs(next - _scheduleStatsHeight) < 0.5) return;
+        _scheduleStatsHeight = next;
+        if (_target is not null)
+            ScheduleSave(_target);
+        else
+            PersistLayoutOnly();
+    }
+
+    public static void SetScheduleStatsDays(int days)
+    {
+        var next = days is 7 or 30 ? days : 14;
+        if (next == _scheduleStatsDays) return;
+        _scheduleStatsDays = next;
         if (_target is not null)
             ScheduleSave(_target);
         else
@@ -70,6 +109,9 @@ internal static class WindowBounds
         {
             _taskRailColumns = Math.Clamp(saved.TaskRailColumns <= 0 ? 1 : saved.TaskRailColumns, 1, 12);
             _suppressHiddenHourTip = saved.SuppressHiddenHourTip;
+            _scheduleStatsExpanded = saved.ScheduleStatsExpanded;
+            _scheduleStatsHeight = saved.ScheduleStatsHeight > 0 ? saved.ScheduleStatsHeight : 240;
+            _scheduleStatsDays = saved.ScheduleStatsDays is 7 or 30 ? saved.ScheduleStatsDays : 14;
         }
 
         if (saved is null || saved.Width < 200 || saved.Height < 160)
@@ -139,7 +181,10 @@ internal static class WindowBounds
             Top = top,
             Maximized = window.WindowState == WindowState.Maximized,
             TaskRailColumns = TaskRailColumns,
-            SuppressHiddenHourTip = SuppressHiddenHourTip
+            SuppressHiddenHourTip = SuppressHiddenHourTip,
+            ScheduleStatsExpanded = ScheduleStatsExpanded,
+            ScheduleStatsHeight = ScheduleStatsHeight,
+            ScheduleStatsDays = ScheduleStatsDays
         });
     }
 
@@ -159,6 +204,9 @@ internal static class WindowBounds
         }
         state.TaskRailColumns = TaskRailColumns;
         state.SuppressHiddenHourTip = SuppressHiddenHourTip;
+        state.ScheduleStatsExpanded = ScheduleStatsExpanded;
+        state.ScheduleStatsHeight = ScheduleStatsHeight;
+        state.ScheduleStatsDays = ScheduleStatsDays;
         WriteState(state);
     }
 
@@ -213,5 +261,8 @@ internal static class WindowBounds
         public bool Maximized { get; set; }
         public int TaskRailColumns { get; set; } = 1;
         public bool SuppressHiddenHourTip { get; set; }
+        public bool ScheduleStatsExpanded { get; set; }
+        public double ScheduleStatsHeight { get; set; } = 240;
+        public int ScheduleStatsDays { get; set; } = 14;
     }
 }

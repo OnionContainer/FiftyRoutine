@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -18,6 +19,8 @@ public partial class BlockStyleEditorWindow : Window
     private ComboBox? _kindBox, _blendBox;
     private FrameworkElement? _blendRow;
     private TextBlock? _paramHint;
+    private BlockStylePreset? _selectedPreset;
+    private readonly HashSet<string> _expandedGroups = new(StringComparer.Ordinal);
 
     private sealed class ParamControl
     {
@@ -69,24 +72,132 @@ public partial class BlockStyleEditorWindow : Window
 
     private void ReloadPresetBox(string? selectId = null)
     {
-        var keep = selectId ?? (PresetBox.SelectedItem as BlockStylePreset)?.Id;
-        PresetBox.Items.Clear();
-        foreach (var p in BlockStylePresets.Load())
-            PresetBox.Items.Add(p);
-        if (keep is not null)
+        var keep = selectId ?? _selectedPreset?.Id;
+        var all = BlockStylePresets.Load();
+        _selectedPreset = keep is null ? null : all.FirstOrDefault(p => p.Id == keep);
+        if (_selectedPreset is null && all.Count > 0)
+            _selectedPreset = all[0];
+        UpdatePresetDropLabel();
+        RebuildPresetTree(all);
+    }
+
+    private void UpdatePresetDropLabel()
+    {
+        if (PresetDropLabel is null) return;
+        if (_selectedPreset is null)
         {
-            foreach (BlockStylePreset p in PresetBox.Items)
+            PresetDropLabel.Text = "选择预设…";
+            return;
+        }
+        var scope = _selectedPreset.IsBuiltin ? "内置" : "用户";
+        PresetDropLabel.Text = $"{scope} / {_selectedPreset.Group} / {_selectedPreset.Name}";
+    }
+
+    private void RebuildPresetTree(List<BlockStylePreset> all)
+    {
+        if (PresetTreeHost is null) return;
+        PresetTreeHost.Children.Clear();
+
+        void AddSection(string title, IEnumerable<BlockStylePreset> presets)
+        {
+            var list = presets.ToList();
+            if (list.Count == 0) return;
+            PresetTreeHost.Children.Add(new TextBlock
             {
-                if (p.Id == keep)
+                Text = title,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(4, 6, 4, 2),
+                Foreground = Theme.Brush("TextSecondaryBrush"),
+                FontSize = 11
+            });
+            foreach (var g in list.GroupBy(p => p.Group))
+            {
+                var groupKey = title + "/" + g.Key;
+                var expanded = _expandedGroups.Contains(groupKey);
+                var header = new DockPanel { Margin = new Thickness(2, 2, 2, 0), Cursor = System.Windows.Input.Cursors.Hand };
+                var arrow = new TextBlock
                 {
-                    PresetBox.SelectedItem = p;
-                    return;
+                    Text = expanded ? "▼" : "▶",
+                    Width = 16,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = Theme.Brush("TextSecondaryBrush"),
+                    FontSize = 10
+                };
+                DockPanel.SetDock(arrow, Dock.Left);
+                header.Children.Add(arrow);
+                header.Children.Add(new TextBlock
+                {
+                    Text = g.Key,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontWeight = FontWeights.SemiBold
+                });
+                var body = new StackPanel
+                {
+                    Margin = new Thickness(16, 0, 0, 4),
+                    Visibility = expanded ? Visibility.Visible : Visibility.Collapsed
+                };
+                foreach (var p in g)
+                {
+                    var btn = new Button
+                    {
+                        Content = p.Name,
+                        HorizontalContentAlignment = HorizontalAlignment.Left,
+                        Padding = new Thickness(8, 3, 8, 3),
+                        Margin = new Thickness(0, 1, 0, 0),
+                        Tag = p,
+                        Background = _selectedPreset?.Id == p.Id
+                            ? Theme.Brush("MenuHoverBackgroundBrush")
+                            : Brushes.Transparent,
+                        BorderThickness = new Thickness(0)
+                    };
+                    btn.Click += (_, _) =>
+                    {
+                        _selectedPreset = p;
+                        UpdatePresetDropLabel();
+                        ApplySpec(p.Spec);
+                        PresetPopup.IsOpen = false;
+                        PresetDropBtn.IsChecked = false;
+                    };
+                    body.Children.Add(btn);
                 }
+                header.MouseLeftButtonUp += (_, _) =>
+                {
+                    if (_expandedGroups.Contains(groupKey))
+                        _expandedGroups.Remove(groupKey);
+                    else
+                        _expandedGroups.Add(groupKey);
+                    RebuildPresetTree(all);
+                };
+                PresetTreeHost.Children.Add(header);
+                PresetTreeHost.Children.Add(body);
             }
         }
-        if (PresetBox.Items.Count > 0 && PresetBox.SelectedIndex < 0)
-            PresetBox.SelectedIndex = 0;
+
+        AddSection("内置", all.Where(p => p.IsBuiltin));
+        AddSection("用户", all.Where(p => !p.IsBuiltin));
+        if (PresetTreeHost.Children.Count == 0)
+        {
+            PresetTreeHost.Children.Add(new TextBlock
+            {
+                Text = "暂无预设。可将 json 放进 ProgramData/DefaultBlockStyle 或 UserData/…/BlockStyle。",
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(6),
+                Foreground = Theme.Brush("TextSecondaryBrush"),
+                FontSize = 11
+            });
+        }
     }
+
+    private void PresetDropBtn_Click(object sender, RoutedEventArgs e)
+    {
+        RebuildPresetTree(BlockStylePresets.Load());
+        PresetPopup.IsOpen = PresetDropBtn.IsChecked == true;
+        if (PresetPopup.IsOpen)
+            PresetPopup.Width = Math.Max(260, PresetDropBtn.ActualWidth);
+    }
+
+    private void PresetPopup_Closed(object? sender, EventArgs e) =>
+        PresetDropBtn.IsChecked = false;
 
     private void ApplySpec(BlockStyleSpec source)
     {
@@ -107,35 +218,75 @@ public partial class BlockStyleEditorWindow : Window
 
     private void ApplyPreset_Click(object sender, RoutedEventArgs e)
     {
-        if (PresetBox.SelectedItem is not BlockStylePreset p)
+        if (_selectedPreset is null)
         {
             MessageBox.Show("请先选择一个预设。");
             return;
         }
-        ApplySpec(p.Spec);
+        ApplySpec(_selectedPreset.Spec);
     }
 
     private void SavePreset_Click(object sender, RoutedEventArgs e)
     {
         _spec.Normalize();
-        var suggested = (PresetBox.SelectedItem as BlockStylePreset)?.Name ?? "我的样式";
+        if (_selectedPreset is { IsBuiltin: true })
+        {
+            var tip = MessageBox.Show(
+                "当前选中的是内置预设（只读）。将另存到用户目录，是否继续？",
+                "个人管理", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (tip != MessageBoxResult.Yes) return;
+        }
+
+        var suggested = _selectedPreset is { IsBuiltin: false }
+            ? _selectedPreset.Name
+            : "我的样式";
         var name = TextPrompt.Ask(this, "存为预设", "预设名称", suggested);
         if (name is null) return;
-        var saved = BlockStylePresets.Upsert(name, _spec);
+
+        var group = _selectedPreset is { IsBuiltin: false }
+            ? _selectedPreset.Group
+            : BlockStylePreset.Ungrouped;
+
+        var targetDir = group == BlockStylePreset.Ungrouped
+            ? BlockStylePresets.UserDir
+            : Path.Combine(BlockStylePresets.UserDir, group);
+        var targetFile = Path.Combine(targetDir, SanitizeForCheck(name) + ".json");
+        if (File.Exists(targetFile))
+        {
+            var ok = MessageBox.Show($"已存在「{name}」，是否覆盖？", "个人管理",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (ok != MessageBoxResult.Yes) return;
+        }
+
+        var saved = BlockStylePresets.Upsert(name, _spec, group);
         ReloadPresetBox(saved.Id);
+    }
+
+    private static string SanitizeForCheck(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var s = new string(name.Trim().Select(ch => invalid.Contains(ch) || ch is '/' or '\\' ? '_' : ch).ToArray());
+        if (string.IsNullOrEmpty(s)) s = "preset";
+        return s.Length > 80 ? s[..80] : s;
     }
 
     private void DeletePreset_Click(object sender, RoutedEventArgs e)
     {
-        if (PresetBox.SelectedItem is not BlockStylePreset p)
+        if (_selectedPreset is null)
         {
             MessageBox.Show("请先选择要删除的预设。");
             return;
         }
-        var ok = MessageBox.Show($"删除预设「{p.Name}」？", "个人管理",
+        if (_selectedPreset.IsBuiltin)
+        {
+            MessageBox.Show("内置预设不可删除。");
+            return;
+        }
+        var ok = MessageBox.Show($"删除预设「{_selectedPreset.Name}」？", "个人管理",
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (ok != MessageBoxResult.Yes) return;
-        BlockStylePresets.Delete(p.Id);
+        BlockStylePresets.Delete(_selectedPreset.FilePath);
+        _selectedPreset = null;
         ReloadPresetBox();
     }
 

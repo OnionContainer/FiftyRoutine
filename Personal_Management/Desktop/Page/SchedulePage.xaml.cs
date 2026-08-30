@@ -35,7 +35,7 @@ public partial class SchedulePage : UserControl
         ApplyTaskRailWidth();
         UpdateGoToNowButton();
         UpdateCurrentRunChrome();
-
+        ApplyStatsLayout(fromSaved: true);
     }
 
     private readonly ObservableCollection<TaskRow> _tasks = [];
@@ -72,6 +72,9 @@ public partial class SchedulePage : UserControl
     private const double MarkSnapPx = 8;
     private const int MarkPressMs = 380;
     private const double NotePinSize = 10;
+    private int _statsRangeDays = 14;
+    private readonly Dictionary<DateTime, double> _statsDirectHours = new();
+    private readonly Dictionary<DateTime, double> _statsOtherHours = new();
 
     private List<ScheduleNoteRow> _weekNotes = [];
     private readonly List<(DateTime Day, Canvas Canvas)> _weekDayCanvases = [];
@@ -363,6 +366,7 @@ public partial class SchedulePage : UserControl
         _weekSpans = spans;
         _weekNotes = notes;
         RenderWeekBoard(start, spans);
+        await RefreshStatsAsync();
     }
 
     private void RenderWeekBoard(DateTime weekStart, List<WeekSpan> spans)
@@ -2058,6 +2062,242 @@ public partial class SchedulePage : UserControl
             SnapRailWidth(Theme.Current.ScheduleCardWidth, WindowBounds.TaskRailColumns));
     }
 
+    private void ApplyStatsLayout(bool fromSaved)
+    {
+        if (StatsRow is null || StatsBody is null || StatsExpandGlyph is null) return;
+        _ = fromSaved;
+        _statsRangeDays = WindowBounds.ScheduleStatsDays;
+        HighlightStatsDayButtons();
+        SetStatsExpanded(WindowBounds.ScheduleStatsExpanded, persist: false);
+    }
+
+    private void SetStatsExpanded(bool expanded, bool persist)
+    {
+        if (StatsRow is null || StatsBody is null || StatsExpandGlyph is null) return;
+        StatsBody.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        StatsExpandGlyph.Text = expanded ? "▾" : "▸";
+        if (expanded)
+            StatsRow.Height = new GridLength(WindowBounds.ScheduleStatsHeight);
+        else
+            StatsRow.Height = new GridLength(28);
+        if (persist)
+            WindowBounds.SetScheduleStatsExpanded(expanded);
+        if (expanded)
+            RenderStatsChart();
+    }
+
+    private void StatsHeader_Click(object sender, MouseButtonEventArgs e)
+    {
+        // 点在近 N 天按钮上不切换展开
+        if (e.OriginalSource is DependencyObject d)
+        {
+            var btn = FindAncestor<Button>(d);
+            if (btn is not null && btn.Tag is string)
+                return;
+        }
+        var expanded = StatsBody?.Visibility != Visibility.Visible;
+        SetStatsExpanded(expanded, persist: true);
+    }
+
+    private void StatsSplitter_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (StatsBody?.Visibility != Visibility.Visible || StatsRow is null) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (StatsRow.ActualHeight >= 80)
+                WindowBounds.SetScheduleStatsHeight(StatsRow.ActualHeight);
+        }, DispatcherPriority.Background);
+    }
+
+    private void StatsDays_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || !int.TryParse(tag, out var days)) return;
+        _statsRangeDays = days is 7 or 30 ? days : 14;
+        WindowBounds.SetScheduleStatsDays(_statsRangeDays);
+        HighlightStatsDayButtons();
+        _ = RefreshStatsAsync();
+    }
+
+    private void HighlightStatsDayButtons()
+    {
+        void StyleBtn(Button? b, int d)
+        {
+            if (b is null) return;
+            b.FontWeight = _statsRangeDays == d ? FontWeights.Bold : FontWeights.Normal;
+        }
+        StyleBtn(StatsDays7, 7);
+        StyleBtn(StatsDays14, 14);
+        StyleBtn(StatsDays30, 30);
+    }
+
+    private void StatsChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        RenderStatsChart();
+
+    private async Task RefreshStatsAsync()
+    {
+        _statsDirectHours.Clear();
+        _statsOtherHours.Clear();
+        if (!_host.Session.BusinessReady)
+        {
+            RenderStatsChart();
+            return;
+        }
+
+        try
+        {
+            var days = _statsRangeDays;
+            var to = DateTime.Today;
+            var from = to.AddDays(1 - days);
+            for (var d = from; d <= to; d = d.AddDays(1))
+            {
+                _statsDirectHours[d] = 0;
+                _statsOtherHours[d] = 0;
+            }
+
+            var byId = _tasks.ToDictionary(t => t.Id);
+            var sessions = await _host.Session.Business.ListRecordsAsync(StoreTables.Sessions);
+            foreach (var s in sessions)
+            {
+                var st = RewardLogic.ParseDate(s, "StartedAt");
+                var en = RewardLogic.ParseDate(s, "EndedAt");
+                if (st is null || en is null || en <= st) continue;
+                if (en.Value.Date < from || st.Value.Date > to) continue;
+
+                var paused = NocoClient.ReadDouble(s, "PausedSeconds");
+                var active = SessionLogic.ActiveSeconds(st.Value, en.Value, paused);
+                if (active <= 0) continue;
+
+                var tid = RewardLogic.LinkedId(s, "Task");
+                byId.TryGetValue(tid ?? "", out var task);
+                var direct = task is { IsDirectProductivity: true };
+                var wall = (en.Value - st.Value).TotalSeconds;
+                if (wall <= 0) continue;
+
+                for (var day = st.Value.Date; day <= en.Value.Date; day = day.AddDays(1))
+                {
+                    if (day < from || day > to) continue;
+                    var dayStart = day;
+                    var dayEnd = day.AddDays(1);
+                    var o0 = st.Value > dayStart ? st.Value : dayStart;
+                    var o1 = en.Value < dayEnd ? en.Value : dayEnd;
+                    if (o1 <= o0) continue;
+                    var share = (o1 - o0).TotalSeconds / wall;
+                    var hours = active * share / 3600.0;
+                    if (direct) _statsDirectHours[day] = _statsDirectHours.GetValueOrDefault(day) + hours;
+                    else _statsOtherHours[day] = _statsOtherHours.GetValueOrDefault(day) + hours;
+                }
+            }
+        }
+        catch
+        {
+            /* keep empty */
+        }
+
+        RenderStatsChart();
+    }
+
+    private void RenderStatsChart()
+    {
+        if (StatsChartCanvas is null || StatsBody?.Visibility != Visibility.Visible) return;
+        StatsChartCanvas.Children.Clear();
+        var w = StatsChartCanvas.ActualWidth;
+        var h = StatsChartCanvas.ActualHeight;
+        if (w < 40 || h < 40) return;
+
+        const double padL = 28, padR = 8, padT = 8, padB = 22;
+        var plotW = Math.Max(10, w - padL - padR);
+        var plotH = Math.Max(10, h - padT - padB);
+        const double maxH = 16;
+
+        var gridBrush = Theme.Brush("GridLineBrush");
+        for (var hour = 0; hour <= 16; hour += 4)
+        {
+            var y = padT + plotH * (1 - hour / maxH);
+            StatsChartCanvas.Children.Add(new Line
+            {
+                X1 = padL,
+                X2 = padL + plotW,
+                Y1 = y,
+                Y2 = y,
+                Stroke = gridBrush,
+                StrokeThickness = 1,
+                StrokeDashArray = hour == 0 || hour == 16 ? null : new DoubleCollection { 2, 2 },
+                IsHitTestVisible = false
+            });
+            StatsChartCanvas.Children.Add(new TextBlock
+            {
+                Text = $"{hour}h",
+                FontSize = 10,
+                Foreground = Theme.Brush("TextSecondaryBrush"),
+                Margin = new Thickness(2, y - 7, 0, 0)
+            });
+        }
+
+        var days = _statsDirectHours.Keys.OrderBy(d => d).ToList();
+        if (days.Count == 0)
+        {
+            var tip = new TextBlock
+            {
+                Text = "暂无数据",
+                Foreground = Theme.Brush("TextSecondaryBrush"),
+                FontSize = 12
+            };
+            Canvas.SetLeft(tip, padL + 8);
+            Canvas.SetTop(tip, padT + 8);
+            StatsChartCanvas.Children.Add(tip);
+            return;
+        }
+
+        Point Map(int i, double hours)
+        {
+            var x = padL + (days.Count == 1 ? plotW / 2 : plotW * i / (days.Count - 1));
+            var y = padT + plotH * (1 - Math.Clamp(hours, 0, maxH) / maxH);
+            return new Point(x, y);
+        }
+
+        void DrawSeries(IReadOnlyDictionary<DateTime, double> series, Brush stroke)
+        {
+            var poly = new Polyline
+            {
+                Stroke = stroke,
+                StrokeThickness = 2,
+                IsHitTestVisible = false
+            };
+            for (var i = 0; i < days.Count; i++)
+                poly.Points.Add(Map(i, series.GetValueOrDefault(days[i])));
+            StatsChartCanvas.Children.Add(poly);
+        }
+
+        DrawSeries(_statsOtherHours, new SolidColorBrush(Color.FromRgb(0xC0, 0x39, 0x2B)));
+        DrawSeries(_statsDirectHours, new SolidColorBrush(Color.FromRgb(0x5B, 0x9B, 0xD5)));
+
+        var labelEvery = days.Count > 14 ? 3 : days.Count > 7 ? 2 : 1;
+        for (var i = 0; i < days.Count; i++)
+        {
+            if (i % labelEvery != 0 && i != days.Count - 1) continue;
+            var p = Map(i, 0);
+            var label = new TextBlock
+            {
+                Text = days[i].ToString("M/d"),
+                FontSize = 10,
+                Foreground = Theme.Brush("TextSecondaryBrush")
+            };
+            Canvas.SetLeft(label, p.X - 10);
+            Canvas.SetTop(label, padT + plotH + 4);
+            StatsChartCanvas.Children.Add(label);
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
+    {
+        while (start is not null)
+        {
+            if (start is T match) return match;
+            start = VisualTreeHelper.GetParent(start);
+        }
+        return null;
+    }
+
     /// <summary>
     /// WrapPanel 左右 Margin(4) + 始终预留竖向滚动条宽。
     /// Auto 滚动条出现时会挤占内容区；预留后有/无滚动条都能摆满整数列，避免裁切与错位。
@@ -2105,7 +2345,11 @@ public partial class SchedulePage : UserControl
         _tasks.Clear();
         RenderTaskCards();
         _weekSpans = [];
+        _weekNotes = [];
         RenderWeekBoard(_weekStart, _weekSpans);
+        _statsDirectHours.Clear();
+        _statsOtherHours.Clear();
+        RenderStatsChart();
     }
 
     public async Task ReloadRewardWishIfOpenAsync()
@@ -2120,6 +2364,7 @@ public partial class SchedulePage : UserControl
         RenderTaskCards();
         if (_weekSpans.Count > 0 || WeekHost.Child is not null)
             RenderWeekBoard(_weekStart, _weekSpans);
+        RenderStatsChart();
     }
 
     public void ToggleFocusFromHost() => ToggleWeekFocusMode();

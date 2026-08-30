@@ -33,15 +33,31 @@
                             HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock DockPanel.Dock="Top" Text="预设" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                <ComboBox x:Name="PresetBox" DockPanel.Dock="Top" Margin="0,0,0,8"
-                          DisplayMemberPath="Name"/>
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <ToggleButton x:Name="PresetDropBtn" Height="28" HorizontalContentAlignment="Left"
+                                  Padding="8,2" Click="PresetDropBtn_Click">
+                        <TextBlock x:Name="PresetDropLabel" Text="选择预设…" TextTrimming="CharacterEllipsis"/>
+                    </ToggleButton>
+                    <Popup x:Name="PresetPopup" PlacementTarget="{Binding ElementName=PresetDropBtn}"
+                           Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                           Closed="PresetPopup_Closed">
+                        <Border Background="{DynamicResource MenuBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="4"
+                                MinWidth="260" MaxHeight="300">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PresetTreeHost"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
                     <Button Content="应用" Width="56" Height="28" Click="ApplyPreset_Click" Margin="0,0,6,0"
                             ToolTip="把所选预设载入当前编辑"/>
                     <Button Content="存为预设" Width="72" Height="28" Click="SavePreset_Click" Margin="0,0,6,0"
-                            ToolTip="将当前配置保存为预设（同名覆盖）"/>
+                            ToolTip="将当前配置保存为用户预设（同名覆盖前确认）"/>
                     <Button Content="删除预设" Width="72" Height="28" Click="DeletePreset_Click"
-                            ToolTip="删除下拉中选中的预设"/>
+                            ToolTip="删除选中的用户预设文件（内置不可删）"/>
                 </StackPanel>
             </DockPanel>
 

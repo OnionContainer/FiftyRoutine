@@ -57,16 +57,78 @@
                                       Background="{DynamicResource BorderSubtleBrush}"
                                       PreviewMouseLeftButtonUp="TaskRailSplitter_MouseUp"/>
                         <Grid Grid.Column="2">
-                            <ScrollViewer x:Name="WeekScroll" HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Auto"
-                                          ScrollChanged="WeekScroll_ScrollChanged"
-                                          PreviewMouseWheel="WeekScroll_PreviewMouseWheel">
-                                <Border x:Name="WeekHost" MinHeight="560" Margin="0,0,8,8"/>
-                            </ScrollViewer>
-                            <Button x:Name="GoToNowButton" Content="回到当前时间"
-                                    HorizontalAlignment="Right" VerticalAlignment="Top"
-                                    Margin="0,8,16,0" Click="GoToNow_Click"
-                                    Panel.ZIndex="2"/>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" MinHeight="120"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition x:Name="StatsRow" Height="28"/>
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <ScrollViewer x:Name="WeekScroll" HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              ScrollChanged="WeekScroll_ScrollChanged"
+                                              PreviewMouseWheel="WeekScroll_PreviewMouseWheel">
+                                    <Border x:Name="WeekHost" MinHeight="200" Margin="0,0,8,0"/>
+                                </ScrollViewer>
+                                <Button x:Name="GoToNowButton" Content="回到当前时间"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="0,8,16,0" Click="GoToNow_Click"
+                                        Panel.ZIndex="2"/>
+                            </Grid>
+                            <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Center" ShowsPreview="True"
+                                          Background="{DynamicResource BorderSubtleBrush}"
+                                          ResizeDirection="Rows"
+                                          PreviewMouseLeftButtonUp="StatsSplitter_MouseUp"/>
+                            <DockPanel Grid.Row="2" x:Name="StatsPanel" Margin="0,0,8,4"
+                                       Background="{DynamicResource SurfaceBackgroundBrush}">
+                                <Border DockPanel.Dock="Top" Height="28" Cursor="Hand"
+                                        Background="Transparent" MouseLeftButtonUp="StatsHeader_Click">
+                                    <DockPanel Margin="6,0">
+                                        <TextBlock x:Name="StatsExpandGlyph" DockPanel.Dock="Left"
+                                                   Text="▸" Width="14" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                                    VerticalAlignment="Center">
+                                            <Button x:Name="StatsDays7" Content="近7天" Height="22" Padding="6,0"
+                                                    Margin="0,0,4,0" Click="StatsDays_Click" Tag="7"/>
+                                            <Button x:Name="StatsDays14" Content="近14天" Height="22" Padding="6,0"
+                                                    Margin="0,0,4,0" Click="StatsDays_Click" Tag="14"/>
+                                            <Button x:Name="StatsDays30" Content="近30天" Height="22" Padding="6,0"
+                                                    Click="StatsDays_Click" Tag="30"/>
+                                        </StackPanel>
+                                        <TextBlock Text="日程块统计" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </DockPanel>
+                                </Border>
+                                <Grid x:Name="StatsBody" Visibility="Collapsed" Margin="4,0,4,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                            BorderThickness="1" Background="{DynamicResource WeekColumnBackgroundBrush}">
+                                        <Canvas x:Name="StatsChartCanvas" ClipToBounds="True"
+                                                SizeChanged="StatsChartCanvas_SizeChanged"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="8,4,0,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <Border Width="14" Height="3" Background="#5B9BD5" VerticalAlignment="Center"/>
+                                            <TextBlock Text=" 直接生产力" Margin="4,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Width="14" Height="3" Background="#C0392B" VerticalAlignment="Center"/>
+                                            <TextBlock Text=" 非直接生产力" Margin="4,0,0,0" FontSize="11"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock x:Name="StatsHintText" Margin="0,10,0,0" FontSize="10"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="纵轴 0–16h；跨日按天切开；含失败，扣暂停。"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DockPanel>
                         </Grid>
                     </Grid>
                 </DockPanel>
