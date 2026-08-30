@@ -21,6 +21,9 @@
             <TabItem x:Name="WeightTab" Header="体重">
                 <local:WeightPage x:Name="WeightPageHost"/>
             </TabItem>
+            <TabItem Header="小玩意">
+                <local:GadgetsPage x:Name="GadgetsPageHost"/>
+            </TabItem>
             <TabItem Header="界面">
                 <local:AppearancePage x:Name="AppearancePageHost"/>
             </TabItem>

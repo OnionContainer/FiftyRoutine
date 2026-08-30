@@ -28,6 +28,7 @@ public partial class MainWindow : Window, IAppHost
         SchedulePageHost.Attach(this);
         FavoritesPageHost.Attach(this);
         WeightPageHost.Attach(this);
+        GadgetsPageHost.Attach(this);
         AppearancePageHost.Attach(this);
         SettingsPageHost.Attach(this);
 
