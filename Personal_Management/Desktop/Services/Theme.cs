@@ -41,6 +41,10 @@ internal sealed class ThemeStyle
     public string ComboSelectedText { get; set; } = "#1A1A1A";
     public string TooltipBackground { get; set; } = "#FFFFF0";
     public string TooltipText { get; set; } = "#1A1A1A";
+    public string MenuBackground { get; set; } = "#FFFFFF";
+    public string MenuText { get; set; } = "#1A1A1A";
+    public string MenuHoverBackground { get; set; } = "#E8E8E8";
+    public string MenuHoverText { get; set; } = "#1A1A1A";
     public string ButtonBackground { get; set; } = "#FAFAFA";
     public string ButtonText { get; set; } = "#1A1A1A";
     public string ButtonHoverBackground { get; set; } = "#E8E8E8";
@@ -115,6 +119,10 @@ internal sealed class ThemeStyle
         ComboSelectedText = ComboSelectedText,
         TooltipBackground = TooltipBackground,
         TooltipText = TooltipText,
+        MenuBackground = MenuBackground,
+        MenuText = MenuText,
+        MenuHoverBackground = MenuHoverBackground,
+        MenuHoverText = MenuHoverText,
         ButtonBackground = ButtonBackground,
         ButtonText = ButtonText,
         ButtonHoverBackground = ButtonHoverBackground,
@@ -235,6 +243,10 @@ internal static class Theme
         ComboSelectedText = "#1A1A1A",
         TooltipBackground = "#FFFFF0",
         TooltipText = "#1A1A1A",
+        MenuBackground = "#FFFFFF",
+        MenuText = "#1A1A1A",
+        MenuHoverBackground = "#E8E8E8",
+        MenuHoverText = "#1A1A1A",
         ButtonBackground = "#FAFAFA",
         ButtonText = "#1A1A1A",
         ButtonHoverBackground = "#E8E8E8",
@@ -294,6 +306,10 @@ internal static class Theme
         ComboSelectedText = "#E8E8E8",
         TooltipBackground = "#2D2D2D",
         TooltipText = "#E8E8E8",
+        MenuBackground = "#2D2D2D",
+        MenuText = "#E8E8E8",
+        MenuHoverBackground = "#3A3A3A",
+        MenuHoverText = "#E8E8E8",
         ButtonBackground = "#2D2D2D",
         ButtonText = "#E8E8E8",
         ButtonHoverBackground = "#3A3A3A",
@@ -447,6 +463,10 @@ internal static class Theme
         SetBrush(app, "ComboSelectedTextBrush", t.ComboSelectedText);
         SetBrush(app, "TooltipBackgroundBrush", t.TooltipBackground);
         SetBrush(app, "TooltipTextBrush", t.TooltipText);
+        SetBrush(app, "MenuBackgroundBrush", t.MenuBackground);
+        SetBrush(app, "MenuTextBrush", t.MenuText);
+        SetBrush(app, "MenuHoverBackgroundBrush", t.MenuHoverBackground);
+        SetBrush(app, "MenuHoverTextBrush", t.MenuHoverText);
         SetBrush(app, "ButtonBackgroundBrush", t.ButtonBackground);
         SetBrush(app, "ButtonTextBrush", t.ButtonText);
         SetBrush(app, "ButtonHoverBackgroundBrush", t.ButtonHoverBackground);

@@ -46,12 +46,13 @@ internal static class SchemaService
             Col("At", "DateTime"),
             Col("DayColumnPercent", "Number"),
             Col("Body", "LongText"),
-            Col("CreatedAt", "DateTime")
+            Col("RecordedAt", "DateTime")
         ]);
         await noco.EnsureColumnAsync(scheduleNotes, Col("At", "DateTime"));
         await noco.EnsureColumnAsync(scheduleNotes, Col("DayColumnPercent", "Number"));
         await noco.EnsureColumnAsync(scheduleNotes, Col("Body", "LongText"));
-        await noco.EnsureColumnAsync(scheduleNotes, Col("CreatedAt", "DateTime"));
+        // 勿用 CreatedAt：与 NocoDB 系统自带列同名，写入会 400
+        await noco.EnsureColumnAsync(scheduleNotes, Col("RecordedAt", "DateTime"));
         var rewards = await noco.EnsureTableAsync(baseId, "reward_pool",
         [
             Col("Kind", "SingleLineText"),

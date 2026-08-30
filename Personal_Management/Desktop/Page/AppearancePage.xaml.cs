@@ -124,6 +124,10 @@ public partial class AppearancePage : UserControl
         SettingsHost.Children.Add(ColorRow("选项栏选中字", t.ComboSelectedText, v => t.ComboSelectedText = v));
         SettingsHost.Children.Add(ColorRow("悬浮提示底", t.TooltipBackground, v => t.TooltipBackground = v));
         SettingsHost.Children.Add(ColorRow("悬浮提示字", t.TooltipText, v => t.TooltipText = v));
+        SettingsHost.Children.Add(ColorRow("右键菜单底", t.MenuBackground, v => t.MenuBackground = v));
+        SettingsHost.Children.Add(ColorRow("右键菜单字", t.MenuText, v => t.MenuText = v));
+        SettingsHost.Children.Add(ColorRow("右键菜单悬停底", t.MenuHoverBackground, v => t.MenuHoverBackground = v));
+        SettingsHost.Children.Add(ColorRow("右键菜单悬停字", t.MenuHoverText, v => t.MenuHoverText = v));
         SettingsHost.Children.Add(ColorRow("按钮底", t.ButtonBackground, v => t.ButtonBackground = v));
         SettingsHost.Children.Add(ColorRow("按钮字", t.ButtonText, v => t.ButtonText = v));
         SettingsHost.Children.Add(ColorRow("按钮悬停底", t.ButtonHoverBackground, v => t.ButtonHoverBackground = v));

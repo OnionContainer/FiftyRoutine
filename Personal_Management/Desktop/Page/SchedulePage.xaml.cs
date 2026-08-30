@@ -1156,7 +1156,7 @@ public partial class SchedulePage : UserControl
                 ["At"] = RewardLogic.FormatDateTime(_pendingNoteAt),
                 ["DayColumnPercent"] = _pendingNotePercent,
                 ["Body"] = dlg.Body,
-                ["CreatedAt"] = RewardLogic.FormatDateTime(DateTime.Now)
+                ["RecordedAt"] = RewardLogic.FormatDateTime(DateTime.Now)
             });
             await LoadWeekAsync();
             _host.StatusText = "已添加笔记钉";
