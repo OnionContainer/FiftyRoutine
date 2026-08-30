@@ -465,7 +465,7 @@ public partial class SchedulePage : UserControl
                 var blockH = Math.Max(4, (visEnd - visStart).TotalHours * pxPerHour);
                 var failed = span.Outcome == "failed";
                 var selected = span.SessionId == _selectedSessionId;
-                var fill = BlockPatterns.CreateBrush(span.Task?.ResolveStyle()).Clone();
+                var fill = BlockPatterns.CreateBrush(span.Task?.ResolveStyle(), 480, blockH).Clone();
                 if (failed) fill.Opacity = Theme.Current.FailedFillOpacity;
                 var rect = new Rectangle
                 {
@@ -1073,7 +1073,7 @@ public partial class SchedulePage : UserControl
         {
             Height = thumbH,
             Background = task.Preview is null
-                ? BlockPatterns.CreateBrush(task.ResolveStyle())
+                ? BlockPatterns.CreateBrush(task.ResolveStyle(), w, thumbH)
                 : Brushes.Transparent,
             Child = task.Preview is null ? null : image,
             CornerRadius = new CornerRadius(thumbRadius),

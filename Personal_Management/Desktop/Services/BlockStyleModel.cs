@@ -36,6 +36,10 @@ public sealed class BlockStyleSpec
         foreach (var l in Layers) l.Normalize();
     }
 
+    /// <summary>是否含非普通混合（需像素合成）。</summary>
+    public bool NeedsPixelBlend() =>
+        Layers.Any(l => BlockStyleLayer.NormalizeBlend(l.BlendMode) != "normal");
+
     /// <summary>从旧版单纹样字段迁移。</summary>
     public static BlockStyleSpec FromLegacy(string? baseHex, string? patternId, string? patternHex)
     {
@@ -61,8 +65,10 @@ public sealed class BlockStyleSpec
 /// <summary>单层纹样；参数尽量统一，各类按需使用子集。</summary>
 public sealed class BlockStyleLayer
 {
-    /// <summary>stripe | sine | diamond | star | dot | moon</summary>
+    /// <summary>solid | stripe | sine | diamond | star | dot | moon</summary>
     public string Kind { get; set; } = "stripe";
+    /// <summary>normal | multiply | overlay</summary>
+    public string BlendMode { get; set; } = "normal";
     public string Color { get; set; } = BlockPatterns.DefaultPatternColor;
     /// <summary>0–1 层透明度。</summary>
     public double Opacity { get; set; } = 1;
@@ -85,6 +91,7 @@ public sealed class BlockStyleLayer
     public BlockStyleLayer Clone() => new()
     {
         Kind = Kind,
+        BlendMode = BlendMode,
         Color = Color,
         Opacity = Opacity,
         Thickness = Thickness,
@@ -100,6 +107,7 @@ public sealed class BlockStyleLayer
     public void Normalize()
     {
         Kind = NormalizeKind(Kind);
+        BlendMode = NormalizeBlend(BlendMode);
         if (string.IsNullOrWhiteSpace(Color)) Color = BlockPatterns.DefaultPatternColor;
         Opacity = Math.Clamp(Opacity, 0, 1);
         Thickness = Math.Clamp(Thickness, 0.5, 64);
@@ -118,21 +126,39 @@ public sealed class BlockStyleLayer
         var k = (kind ?? "").Trim().ToLowerInvariant();
         return k switch
         {
-            "stripe" or "stripe-right" or "stripe-left" or "sine"
+            "solid" or "stripe" or "stripe-right" or "stripe-left" or "sine"
                 or "diamond" or "star" or "dot" or "moon" =>
                 k is "stripe-right" or "stripe-left" ? "stripe" : k,
             _ => "stripe"
         };
     }
 
+    public static string NormalizeBlend(string? mode)
+    {
+        var m = (mode ?? "").Trim().ToLowerInvariant();
+        return m switch
+        {
+            "multiply" or "overlay" => m,
+            _ => "normal"
+        };
+    }
+
     public static readonly (string Id, string Label)[] Kinds =
     [
+        ("solid", "纯色"),
         ("stripe", "斜纹"),
         ("sine", "正弦纹路"),
         ("diamond", "棱形散布"),
         ("star", "星形散布"),
         ("dot", "圆点散布"),
         ("moon", "月亮散布")
+    ];
+
+    public static readonly (string Id, string Label)[] BlendModes =
+    [
+        ("normal", "普通"),
+        ("multiply", "正片叠底"),
+        ("overlay", "叠加")
     ];
 
     public static BlockStyleLayer? FromLegacyKind(string normalizedId, string? color)

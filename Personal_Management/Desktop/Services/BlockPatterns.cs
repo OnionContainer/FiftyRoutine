@@ -1,7 +1,6 @@
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
+using System.Windows.Media.Imaging;
 
 namespace PersonalManagement.Desktop;
 
@@ -49,15 +48,74 @@ internal static class BlockPatterns
     public static Brush CreateBrush(string? baseHex, string? patternId, string? patternHex) =>
         CreateBrush(BlockStyleSpec.FromLegacy(baseHex, patternId, patternHex));
 
-    public static Brush CreateBrush(BlockStyleSpec? spec)
+    /// <param name="pixelWidth">含非普通混合时建议传入目标宽（DIP）；≤0 用默认。</param>
+    /// <param name="pixelHeight">含非普通混合时建议传入目标高（DIP）；≤0 用默认。</param>
+    public static Brush CreateBrush(BlockStyleSpec? spec, double pixelWidth = 0, double pixelHeight = 0)
     {
         spec ??= new BlockStyleSpec();
         spec.Normalize();
         if (spec.Layers.Count == 0)
             return TaskVisual.BrushOf(spec.BaseColor);
 
+        if (spec.NeedsPixelBlend())
+        {
+            var w = Math.Max(1, (int)Math.Ceiling(pixelWidth > 0 ? pixelWidth : 480));
+            var h = Math.Max(1, (int)Math.Ceiling(pixelHeight > 0 ? pixelHeight : 160));
+            // 上限避免周板超高块一次栅格过大
+            w = Math.Min(w, 1024);
+            h = Math.Min(h, 4096);
+            return CreateBlendedImageBrush(spec, w, h);
+        }
+
+        return CreateVectorBrush(spec);
+    }
+
+    public static FrameworkElement BuildVisual(BlockStyleSpec spec, double width, double height)
+    {
+        spec.Normalize();
+        width = Math.Max(1, width);
+        height = Math.Max(1, height);
+
+        if (spec.Layers.Count == 0 || !spec.NeedsPixelBlend())
+        {
+            var grid = new System.Windows.Controls.Grid { Width = width, Height = height, ClipToBounds = true };
+            grid.Children.Add(new System.Windows.Shapes.Rectangle
+            {
+                Fill = TaskVisual.BrushOf(spec.BaseColor),
+                Width = width,
+                Height = height
+            });
+            foreach (var layer in spec.Layers)
+            {
+                var brush = CreateLayerTileBrush(layer);
+                var rect = new System.Windows.Shapes.Rectangle
+                {
+                    Width = width,
+                    Height = height,
+                    Fill = brush,
+                    Opacity = layer.Opacity,
+                    IsHitTestVisible = false
+                };
+                grid.Children.Add(rect);
+            }
+            return grid;
+        }
+
+        var imgBrush = CreateBlendedImageBrush(spec,
+            Math.Max(1, (int)Math.Ceiling(width)),
+            Math.Max(1, (int)Math.Ceiling(height)));
+        return new System.Windows.Shapes.Rectangle
+        {
+            Width = width,
+            Height = height,
+            Fill = imgBrush,
+            IsHitTestVisible = false
+        };
+    }
+
+    private static Brush CreateVectorBrush(BlockStyleSpec spec)
+    {
         // 绝对 DIP 平铺底色+纹样；DrawingBrush 不拉伸，色块只裁切可见部分
-        // （旧 VisualBrush+Stretch.Fill 会随色块宽高把纹样拉变形）
         const double extent = 8192;
         var group = new DrawingGroup();
         group.Children.Add(new GeometryDrawing(
@@ -87,41 +145,114 @@ internal static class BlockPatterns
         return brush;
     }
 
-    public static FrameworkElement BuildVisual(BlockStyleSpec spec, double width, double height)
+    /// <summary>绘制时像素合成（不烘焙样式参数）；普通/正片叠底/叠加。</summary>
+    private static ImageBrush CreateBlendedImageBrush(BlockStyleSpec spec, int w, int h)
     {
-        spec.Normalize();
-        var grid = new Grid { Width = width, Height = height, ClipToBounds = true };
-        grid.Children.Add(new System.Windows.Shapes.Rectangle
+        var baseC = TaskVisual.ParseColor(spec.BaseColor);
+        var dst = new byte[w * h * 4];
+        for (var i = 0; i < w * h; i++)
         {
-            Fill = TaskVisual.BrushOf(spec.BaseColor),
-            Width = width,
-            Height = height
-        });
+            var o = i * 4;
+            dst[o] = baseC.B;
+            dst[o + 1] = baseC.G;
+            dst[o + 2] = baseC.R;
+            dst[o + 3] = 255;
+        }
+
         foreach (var layer in spec.Layers)
         {
-            var brush = CreateLayerTileBrush(layer);
-            var rect = new System.Windows.Shapes.Rectangle
-            {
-                Width = width,
-                Height = height,
-                Fill = brush,
-                Opacity = layer.Opacity,
-                IsHitTestVisible = false
-            };
-            grid.Children.Add(rect);
+            var src = RenderLayerPixels(layer, w, h);
+            BlendOnto(dst, src, w * h, BlockStyleLayer.NormalizeBlend(layer.BlendMode), layer.Opacity);
         }
-        return grid;
+
+        var bmp = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
+        bmp.WritePixels(new Int32Rect(0, 0, w, h), dst, w * 4, 0);
+        bmp.Freeze();
+
+        var brush = new ImageBrush(bmp)
+        {
+            Stretch = Stretch.None,
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top,
+            TileMode = TileMode.None
+        };
+        brush.Freeze();
+        return brush;
     }
+
+    private static byte[] RenderLayerPixels(BlockStyleLayer layer, int w, int h)
+    {
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(CreateLayerTileBrush(layer), null, new Rect(0, 0, w, h));
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var conv = new FormatConvertedBitmap(rtb, PixelFormats.Bgra32, null, 0);
+        var pixels = new byte[w * h * 4];
+        conv.CopyPixels(pixels, w * 4, 0);
+        return pixels;
+    }
+
+    private static void BlendOnto(byte[] dst, byte[] src, int pixelCount, string mode, double opacity)
+    {
+        var op = (float)Math.Clamp(opacity, 0, 1);
+        for (var i = 0; i < pixelCount; i++)
+        {
+            var o = i * 4;
+            var a = src[o + 3] / 255f * op;
+            if (a < 0.001f) continue;
+
+            var cbB = dst[o] / 255f;
+            var cbG = dst[o + 1] / 255f;
+            var cbR = dst[o + 2] / 255f;
+            var ctB = src[o] / 255f;
+            var ctG = src[o + 1] / 255f;
+            var ctR = src[o + 2] / 255f;
+
+            float csR, csG, csB;
+            if (mode == "multiply")
+            {
+                csR = cbR * ctR;
+                csG = cbG * ctG;
+                csB = cbB * ctB;
+            }
+            else if (mode == "overlay")
+            {
+                csR = OverlayChannel(cbR, ctR);
+                csG = OverlayChannel(cbG, ctG);
+                csB = OverlayChannel(cbB, ctB);
+            }
+            else
+            {
+                csR = ctR;
+                csG = ctG;
+                csB = ctB;
+            }
+
+            dst[o] = (byte)Math.Clamp(((1 - a) * cbB + a * csB) * 255f + 0.5f, 0, 255);
+            dst[o + 1] = (byte)Math.Clamp(((1 - a) * cbG + a * csG) * 255f + 0.5f, 0, 255);
+            dst[o + 2] = (byte)Math.Clamp(((1 - a) * cbR + a * csR) * 255f + 0.5f, 0, 255);
+            dst[o + 3] = 255;
+        }
+    }
+
+    private static float OverlayChannel(float cb, float ct) =>
+        cb < 0.5f ? 2f * cb * ct : 1f - 2f * (1f - cb) * (1f - ct);
 
     public static Brush CreateLayerTileBrush(BlockStyleLayer layer)
     {
         layer.Normalize();
-        var spacing = layer.Spacing;
         var color = TaskVisual.ParseColor(layer.Color);
-        // 纹样本体不透明；层透明度由外层 Opacity 控制
+        // 纹样本体不透明；层透明度由外层 Opacity / 像素合成控制
         var pat = new SolidColorBrush(Color.FromArgb(255, color.R, color.G, color.B));
         pat.Freeze();
 
+        if (layer.Kind == "solid")
+            return pat;
+
+        var spacing = layer.Spacing;
         var unit = layer.Kind switch
         {
             "sine" => SineTile(pat, spacing, layer.Thickness, layer.Size),

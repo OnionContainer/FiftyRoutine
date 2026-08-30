@@ -15,11 +15,13 @@ public partial class BlockStyleEditorWindow : Window
     private ColorTarget _colorTarget = ColorTarget.Base;
     private bool _building;
     private ParamControl? _opacity, _thickness, _spacing, _angle, _size, _offX, _offY, _cumX, _cumY;
-    private ComboBox? _kindBox;
+    private ComboBox? _kindBox, _blendBox;
+    private FrameworkElement? _blendRow;
     private TextBlock? _paramHint;
 
     private sealed class ParamControl
     {
+        public required FrameworkElement Row { get; init; }
         public required Slider Slider { get; init; }
         public required TextBox Box { get; init; }
         public required double Tick { get; init; }
@@ -29,6 +31,9 @@ public partial class BlockStyleEditorWindow : Window
             Slider.IsEnabled = on;
             Box.IsEnabled = on;
         }
+
+        public void SetVisible(bool visible) =>
+            Row.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
         public void SetValue(double v, bool syncing)
         {
@@ -177,8 +182,7 @@ public partial class BlockStyleEditorWindow : Window
     private void BuildParamEditors()
     {
         ParamHost.Children.Clear();
-        ParamHost.Children.Add(RowLabel("类型"));
-        _kindBox = new ComboBox { Margin = new Thickness(0, 0, 0, 8) };
+        _kindBox = new ComboBox { Margin = new Thickness(0, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         foreach (var (id, label) in BlockStyleLayer.Kinds)
             _kindBox.Items.Add(new ComboBoxItem { Content = label, Tag = id });
         _kindBox.SelectionChanged += (_, _) =>
@@ -187,10 +191,23 @@ public partial class BlockStyleEditorWindow : Window
             _spec.Layers[_selected].Kind = BlockStyleLayer.NormalizeKind(ci.Tag as string);
             RebuildLayerList();
             LayerList.SelectedIndex = _selected;
+            ApplyParamVisibilityForKind(_spec.Layers[_selected].Kind);
             RefreshPreview();
             UpdateParamHint();
         };
-        ParamHost.Children.Add(_kindBox);
+        ParamHost.Children.Add(CompactLabeledRow("类型", _kindBox));
+
+        _blendBox = new ComboBox { VerticalAlignment = VerticalAlignment.Center };
+        foreach (var (id, label) in BlockStyleLayer.BlendModes)
+            _blendBox.Items.Add(new ComboBoxItem { Content = label, Tag = id });
+        _blendBox.SelectionChanged += (_, _) =>
+        {
+            if (_building || _selected < 0 || _blendBox.SelectedItem is not ComboBoxItem ci) return;
+            _spec.Layers[_selected].BlendMode = BlockStyleLayer.NormalizeBlend(ci.Tag as string);
+            RefreshPreview();
+        };
+        _blendRow = CompactLabeledRow("混合", _blendBox);
+        ParamHost.Children.Add(_blendRow);
 
         _opacity = AddParam("透明度", 0, 1, 0.01, v =>
         {
@@ -227,12 +244,12 @@ public partial class BlockStyleEditorWindow : Window
             if (_selected >= 0) _spec.Layers[_selected].OffsetY = v;
             RefreshPreview();
         });
-        _cumX = AddParam("X 累积偏移", -40, 40, 0.5, v =>
+        _cumX = AddParam("X 累积", -40, 40, 0.5, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].CumulativeOffsetX = v;
             RefreshPreview();
         });
-        _cumY = AddParam("Y 累积偏移", -40, 40, 0.5, v =>
+        _cumY = AddParam("Y 累积", -40, 40, 0.5, v =>
         {
             if (_selected >= 0) _spec.Layers[_selected].CumulativeOffsetY = v;
             RefreshPreview();
@@ -242,39 +259,54 @@ public partial class BlockStyleEditorWindow : Window
         {
             TextWrapping = TextWrapping.Wrap,
             Foreground = Theme.Brush("TextSecondaryBrush"),
-            Margin = new Thickness(0, 8, 0, 0),
-            FontSize = 12
+            Margin = new Thickness(0, 6, 0, 0),
+            FontSize = 11
         };
         ParamHost.Children.Add(_paramHint);
     }
 
-    private static TextBlock RowLabel(string text) => new()
+    private static DockPanel CompactLabeledRow(string label, UIElement right)
     {
-        Text = text,
-        Margin = new Thickness(0, 4, 0, 2),
-        Foreground = Theme.Brush("TextSecondaryBrush")
-    };
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 3), LastChildFill = true };
+        var lab = new TextBlock
+        {
+            Text = label,
+            Width = 64,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Theme.Brush("TextSecondaryBrush"),
+            FontSize = 12
+        };
+        DockPanel.SetDock(lab, Dock.Left);
+        row.Children.Add(lab);
+        row.Children.Add(right);
+        return row;
+    }
 
     private ParamControl AddParam(string label, double min, double max, double tick, Action<double> onChange)
     {
-        ParamHost.Children.Add(RowLabel(label));
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
         var box = new TextBox
         {
-            Width = 52,
+            Width = 44,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0)
+            Margin = new Thickness(4, 0, 0, 0),
+            Padding = new Thickness(2, 1, 2, 1),
+            FontSize = 12
         };
-        DockPanel.SetDock(box, Dock.Right);
         var slider = new Slider
         {
             Minimum = min,
             Maximum = max,
             TickFrequency = tick,
             IsSnapToTickEnabled = tick >= 1,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            MinWidth = 40
         };
-        var ctrl = new ParamControl { Slider = slider, Box = box, Tick = tick };
+        var mid = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(box, Dock.Right);
+        mid.Children.Add(box);
+        mid.Children.Add(slider);
+        var row = CompactLabeledRow(label, mid);
+        var ctrl = new ParamControl { Row = row, Slider = slider, Box = box, Tick = tick };
         slider.ValueChanged += (_, _) =>
         {
             if (_building) return;
@@ -305,8 +337,6 @@ public partial class BlockStyleEditorWindow : Window
                 e.Handled = true;
             }
         };
-        row.Children.Add(box);
-        row.Children.Add(slider);
         ParamHost.Children.Add(row);
         return ctrl;
     }
@@ -315,9 +345,11 @@ public partial class BlockStyleEditorWindow : Window
     {
         _building = true;
         if (_kindBox is not null) _kindBox.IsEnabled = false;
+        if (_blendBox is not null) _blendBox.IsEnabled = false;
         SetParamsEnabled(false);
+        ApplyParamVisibilityForKind(null);
         if (_paramHint is not null)
-            _paramHint.Text = "尚未添加纹样层。可只改底色，或点「添加层」。";
+            _paramHint.Text = "尚未添加样式层。可只改底色，或点「添加层」。";
         _building = false;
     }
 
@@ -326,6 +358,41 @@ public partial class BlockStyleEditorWindow : Window
         foreach (var p in new[] { _opacity, _thickness, _spacing, _angle, _size, _offX, _offY, _cumX, _cumY })
             p?.SetEnabled(on);
         if (_kindBox is not null) _kindBox.IsEnabled = on;
+        if (_blendBox is not null) _blendBox.IsEnabled = on;
+    }
+
+    /// <summary>
+    /// 无效参数直接隐藏（非灰掉）：solid 仅透明度；stripe 无尺寸；diamond/star/dot/moon 无粗细；sine 全开。
+    /// 混合模式对所有 Kind 均显示。kind 为 null 时隐藏全部参数行（无选中层）。
+    /// </summary>
+    private void ApplyParamVisibilityForKind(string? kind)
+    {
+        var has = !string.IsNullOrEmpty(kind);
+        if (_blendRow is not null)
+            _blendRow.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        _opacity?.SetVisible(has);
+        if (!has || kind == "solid")
+        {
+            _spacing?.SetVisible(false);
+            _angle?.SetVisible(false);
+            _offX?.SetVisible(false);
+            _offY?.SetVisible(false);
+            _cumX?.SetVisible(false);
+            _cumY?.SetVisible(false);
+            _thickness?.SetVisible(false);
+            _size?.SetVisible(false);
+            return;
+        }
+        _spacing?.SetVisible(true);
+        _angle?.SetVisible(true);
+        _offX?.SetVisible(true);
+        _offY?.SetVisible(true);
+        _cumX?.SetVisible(true);
+        _cumY?.SetVisible(true);
+        var useThickness = kind is "stripe" or "sine";
+        var useSize = kind is "sine" or "diamond" or "star" or "dot" or "moon";
+        _thickness?.SetVisible(useThickness);
+        _size?.SetVisible(useSize);
     }
 
     private void LoadParamsFromLayer()
@@ -339,6 +406,7 @@ public partial class BlockStyleEditorWindow : Window
         l.Normalize();
         _building = true;
         SetParamsEnabled(true);
+        ApplyParamVisibilityForKind(l.Kind);
         if (_kindBox is not null)
         {
             foreach (ComboBoxItem item in _kindBox.Items)
@@ -346,6 +414,17 @@ public partial class BlockStyleEditorWindow : Window
                 if ((item.Tag as string) == l.Kind)
                 {
                     _kindBox.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+        if (_blendBox is not null)
+        {
+            foreach (ComboBoxItem item in _blendBox.Items)
+            {
+                if ((item.Tag as string) == l.BlendMode)
+                {
+                    _blendBox.SelectedItem = item;
                     break;
                 }
             }
@@ -369,10 +448,11 @@ public partial class BlockStyleEditorWindow : Window
         var k = _spec.Layers[_selected].Kind;
         _paramHint.Text = k switch
         {
-            "stripe" => "斜纹：主要用粗细、间隔、角度；尺寸一般不用。偏移=相位；累积偏移=行间错开。",
-            "sine" => "正弦纹路：粗细=线宽，间隔=波长，尺寸=振幅。偏移=相位；累积偏移=行间错开。",
-            "diamond" or "star" or "dot" or "moon" => "散布：尺寸=图案大小，间隔=铺贴周期。偏移移动格子；累积偏移使行/列递增错开。",
-            _ => "统一参数：透明度、间隔、角度、粗细、尺寸、XY 偏移与累积偏移。"
+            "solid" => "纯色：铺满本层；混合模式在绘制时与下层合成（不烘焙参数）。",
+            "stripe" => "斜纹：粗细 / 间隔 / 角度；偏移=相位，累积=行间错开。",
+            "sine" => "正弦：粗细=线宽，间隔=波长，尺寸=振幅。",
+            "diamond" or "star" or "dot" or "moon" => "散布：尺寸=图案大小，间隔=铺贴周期。",
+            _ => ""
         };
     }
 
@@ -427,7 +507,7 @@ public partial class BlockStyleEditorWindow : Window
     {
         if (_selected < 0)
         {
-            MessageBox.Show("请先添加并选中一层纹样。");
+            MessageBox.Show("请先添加并选中一层。");
             return;
         }
         SelectColorTarget(ColorTarget.Layer);

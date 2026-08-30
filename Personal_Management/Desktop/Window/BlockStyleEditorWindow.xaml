@@ -47,7 +47,7 @@
 
             <!-- 层列表与参数 -->
             <DockPanel Grid.Column="1" Margin="0,0,10,0">
-                <TextBlock DockPanel.Dock="Top" Text="纹样层" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <TextBlock DockPanel.Dock="Top" Text="样式层" FontWeight="SemiBold" Margin="0,0,0,8"/>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                     <Button Content="添加层" Width="72" Height="28" Click="AddLayer_Click" Margin="0,0,6,0"/>
                     <Button Content="删除层" Width="72" Height="28" Click="RemoveLayer_Click" Margin="0,0,6,0"/>

@@ -112,7 +112,9 @@ public partial class NewTaskWindow : Window
         var spec = BlockStyleSpec.FromJson(BlockStyleJson)
                    ?? BlockStyleSpec.FromLegacy(ColorHex, BlockPattern, BlockPatternColor);
         spec.BaseColor = ColorHex;
-        PatternPreview.Background = BlockPatterns.CreateBrush(spec);
+        PatternPreview.Background = BlockPatterns.CreateBrush(spec,
+            Math.Max(80, PatternPreview.ActualWidth > 0 ? PatternPreview.ActualWidth : 200),
+            Math.Max(24, PatternPreview.ActualHeight > 0 ? PatternPreview.ActualHeight : 28));
     }
 
     private void OpenStyleEditor_Click(object sender, RoutedEventArgs e)
