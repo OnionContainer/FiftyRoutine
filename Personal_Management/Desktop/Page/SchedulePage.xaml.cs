@@ -71,6 +71,24 @@ public partial class SchedulePage : UserControl
     private DispatcherTimer? _markPressTimer;
     private const double MarkSnapPx = 8;
     private const int MarkPressMs = 380;
+    private const double NotePinSize = 10;
+
+    private List<ScheduleNoteRow> _weekNotes = [];
+    private readonly List<(DateTime Day, Canvas Canvas)> _weekDayCanvases = [];
+    private readonly List<Line> _hoverGuideLines = [];
+    private TextBlock? _hoverTimeLabel;
+    private System.Windows.Controls.Primitives.Popup? _notePopup;
+    private string? _openNoteId;
+    private DateTime _pendingNoteAt;
+    private double _pendingNotePercent;
+
+    private sealed class ScheduleNoteRow
+    {
+        public string Id { get; set; } = "";
+        public DateTime At { get; set; }
+        public double DayColumnPercent { get; set; }
+        public string Body { get; set; } = "";
+    }
 
     private sealed class WeekSpan
     {
@@ -324,18 +342,40 @@ public partial class SchedulePage : UserControl
         }
         if (_selectedSessionId is not null && spans.All(x => x.SessionId != _selectedSessionId))
             _selectedSessionId = null;
+
+        var notes = new List<ScheduleNoteRow>();
+        var noteRows = await _host.Session.Business.ListRecordsAsync(StoreTables.ScheduleNotes);
+        foreach (var n in noteRows)
+        {
+            var nid = NocoClient.ReadId(n);
+            var at = RewardLogic.ParseDate(n, "At");
+            if (string.IsNullOrEmpty(nid) || at is null) continue;
+            notes.Add(new ScheduleNoteRow
+            {
+                Id = nid,
+                At = at.Value,
+                DayColumnPercent = Math.Clamp(NocoClient.ReadDouble(n, "DayColumnPercent"), 0, 1),
+                Body = NocoClient.ReadString(n, "Body") ?? ""
+            });
+        }
+
         _weekStart = start;
         _weekSpans = spans;
+        _weekNotes = notes;
         RenderWeekBoard(start, spans);
     }
 
     private void RenderWeekBoard(DateTime weekStart, List<WeekSpan> spans)
     {
+        CloseNotePopup();
         var pxPerHour = EffectiveWeekPxPerHour;
         var (hourStart, hourEnd) = VisibleWeekHours;
         var height = WeekDayHeight(pxPerHour);
         _weekNowLines.Clear();
         _weekTodayDots.Clear();
+        _weekDayCanvases.Clear();
+        _hoverGuideLines.Clear();
+        _hoverTimeLabel = null;
         var root = new Grid();
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         for (var i = 0; i < 7; i++)
@@ -356,6 +396,28 @@ public partial class SchedulePage : UserControl
             Canvas.SetTop(label, Math.Max(0, (h - hourStart) * pxPerHour - 8));
             labels.Children.Add(label);
         }
+        _hoverTimeLabel = new TextBlock
+        {
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.Brush("AccentBrush"),
+            Visibility = Visibility.Collapsed
+        };
+        labels.Children.Add(_hoverTimeLabel);
+        var labelGuide = new Line
+        {
+            X1 = 0,
+            X2 = 40,
+            Stroke = Theme.Brush("AccentBrush"),
+            StrokeThickness = 1,
+            StrokeDashArray = new DoubleCollection { 2, 2 },
+            Opacity = 0.85,
+            Visibility = Visibility.Collapsed,
+            IsHitTestVisible = false,
+            Tag = "hoverGuide"
+        };
+        labels.Children.Add(labelGuide);
+        _hoverGuideLines.Add(labelGuide);
         Grid.SetRow(labels, 1);
         root.Children.Add(labels);
 
@@ -412,7 +474,7 @@ public partial class SchedulePage : UserControl
                         }
                         Canvas.SetLeft(child, 3);
                     }
-                    else if (child is Line line && (tag is "hour" or "hourStrong" or "now"))
+                    else if (child is Line line && (tag is "hour" or "hourStrong" or "now" or "hoverGuide"))
                     {
                         line.X2 = colW;
                     }
@@ -420,6 +482,10 @@ public partial class SchedulePage : UserControl
                     {
                         child.Width = Math.Max(20, colW - 4);
                         Canvas.SetLeft(child, 2);
+                    }
+                    else if (tag == "notePin" && child.DataContext is ScheduleNoteRow note)
+                    {
+                        Canvas.SetLeft(child, note.DayColumnPercent * colW - child.Width / 2);
                     }
                     else if (tag == "todayDot" && child is Ellipse)
                     {
@@ -430,6 +496,7 @@ public partial class SchedulePage : UserControl
             canvas.Loaded += (_, _) => FitLayout();
             canvas.SizeChanged += (_, _) => FitLayout();
             WireWeekColumnCanvas(canvas, day, height, pxPerHour);
+            _weekDayCanvases.Add((day.Date, canvas));
 
             for (var h = hourStart; h <= hourEnd; h++)
             {
@@ -529,6 +596,13 @@ public partial class SchedulePage : UserControl
                 }
             }
 
+            foreach (var note in _weekNotes)
+            {
+                if (note.At.Date != dayStart) continue;
+                if (note.At < winStart || note.At > winEnd) continue;
+                AddNotePinVisual(canvas, note, dayStart, pxPerHour);
+            }
+
             var nowTheme = Theme.Current;
             var nowLine = new Line
             {
@@ -559,6 +633,22 @@ public partial class SchedulePage : UserControl
                 canvas.Children.Add(todayDot);
                 _weekTodayDots.Add((day.Date, todayDot));
             }
+
+            var hoverLine = new Line
+            {
+                X1 = 0,
+                X2 = 4000,
+                Stroke = Theme.Brush("AccentBrush"),
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 2, 2 },
+                Opacity = 0.9,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false,
+                Tag = "hoverGuide"
+            };
+            Panel.SetZIndex(hoverLine, 40);
+            canvas.Children.Add(hoverLine);
+            _hoverGuideLines.Add(hoverLine);
 
             DrawMarkRectOnCanvas(canvas, day, pxPerHour, height);
 
@@ -673,12 +763,13 @@ public partial class SchedulePage : UserControl
     {
         canvas.MouseLeftButtonDown += (_, e) =>
         {
-            if (e.OriginalSource is FrameworkElement fe && fe.Tag as string == "span")
+            if (e.OriginalSource is FrameworkElement fe && fe.Tag as string is "span" or "notePin")
                 return;
             if (e.OriginalSource is not Canvas && e.OriginalSource is FrameworkElement src
                 && src.Tag as string is "name" or "pause" or "mark")
                 return;
 
+            CloseNotePopup();
             _selectedSessionId = null;
             CancelMarkPress();
             ClearMarkSelection(rerender: false);
@@ -699,6 +790,9 @@ public partial class SchedulePage : UserControl
         };
         canvas.MouseMove += (_, e) =>
         {
+            if (!_markDragging && !_markPressArmed)
+                UpdateHoverGuide(ClampY(e.GetPosition(canvas).Y, height), pxPerHour);
+
             if (_markPressArmed && !_markDragging && _markPressCanvas == canvas)
             {
                 var p = e.GetPosition(canvas);
@@ -715,6 +809,14 @@ public partial class SchedulePage : UserControl
             UpdateMarkFromAnchor(day.Date, y, pxPerHour);
             RefreshMarkVisual(canvas, day.Date, pxPerHour, height);
             e.Handled = true;
+        };
+        canvas.MouseLeave += (_, _) =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_weekDayCanvases.Any(c => c.Canvas.IsMouseOver)) return;
+                HideHoverGuide();
+            });
         };
         canvas.MouseLeftButtonUp += (_, e) =>
         {
@@ -740,9 +842,8 @@ public partial class SchedulePage : UserControl
         };
         canvas.MouseRightButtonUp += (_, e) =>
         {
-            if (_markRangeStart is null || _markRangeEnd is null) return;
-            if (_markRangeStart.Value.Date != day.Date) return;
-            ShowMarkContextMenu(canvas);
+            var pos = e.GetPosition(canvas);
+            ShowWeekContextMenu(canvas, day.Date, pos, height, pxPerHour);
             e.Handled = true;
         };
     }
@@ -849,7 +950,7 @@ public partial class SchedulePage : UserControl
         Panel.SetZIndex(shape, 50);
         shape.MouseRightButtonUp += (_, e) =>
         {
-            ShowMarkContextMenu(canvas);
+            ShowWeekContextMenu(canvas, day.Date, e.GetPosition(canvas), WeekDayHeight(pxPerHour), pxPerHour);
             e.Handled = true;
         };
         canvas.Children.Add(shape);
@@ -893,26 +994,208 @@ public partial class SchedulePage : UserControl
         return true;
     }
 
-    private void ShowMarkContextMenu(Canvas canvas)
+    private void ShowWeekContextMenu(Canvas canvas, DateTime day, Point pos, double height, double pxPerHour)
     {
+        var y = ClampY(pos.Y, height);
+        _pendingNoteAt = DayTimeFromY(day, y, pxPerHour);
+        var colW = Math.Max(1, canvas.ActualWidth);
+        _pendingNotePercent = Math.Clamp(pos.X / colW, 0, 1);
+
         var menu = new ContextMenu();
-        var root = new MenuItem
+        var addPin = new MenuItem { Header = "添加笔记钉" };
+        addPin.Click += async (_, _) => await AddNotePinAtPendingAsync();
+        menu.Items.Add(addPin);
+
+        var hasSelection = _markRangeStart is not null && _markRangeEnd is not null
+                           && _markRangeStart.Value.Date == day.Date;
+        if (hasSelection)
         {
-            Header = "标记为指定活动",
-            IsEnabled = CanMarkSelection(),
-            ToolTip = IsRunActive ? "有任务正在执行，不可框选补记" : null
-        };
-        foreach (var task in _tasks.Where(t => !t.Archived).OrderBy(t => t.Title))
-        {
-            var item = new MenuItem { Header = task.Title, Tag = task };
-            item.Click += async (_, _) => await MarkSelectionAsTaskAsync(task);
-            root.Items.Add(item);
+            var root = new MenuItem
+            {
+                Header = "标记为指定活动",
+                IsEnabled = CanMarkSelection(),
+                ToolTip = IsRunActive ? "有任务正在执行，不可框选补记" : null
+            };
+            foreach (var task in _tasks.Where(t => !t.Archived).OrderBy(t => t.Title))
+            {
+                var item = new MenuItem { Header = task.Title, Tag = task };
+                item.Click += async (_, _) => await MarkSelectionAsTaskAsync(task);
+                root.Items.Add(item);
+            }
+            if (root.Items.Count == 0)
+                root.Items.Add(new MenuItem { Header = "（无可用任务）", IsEnabled = false });
+            menu.Items.Add(root);
         }
-        if (root.Items.Count == 0)
-            root.Items.Add(new MenuItem { Header = "（无可用任务）", IsEnabled = false });
-        menu.Items.Add(root);
+
         canvas.ContextMenu = menu;
         menu.IsOpen = true;
+    }
+
+    private void UpdateHoverGuide(double y, double pxPerHour)
+    {
+        var (s, _) = VisibleWeekHours;
+        var t = TimeSpan.FromHours(s + y / pxPerHour);
+        foreach (var line in _hoverGuideLines)
+        {
+            line.Visibility = Visibility.Visible;
+            line.Y1 = y;
+            line.Y2 = y;
+        }
+        if (_hoverTimeLabel is not null)
+        {
+            _hoverTimeLabel.Visibility = Visibility.Visible;
+            _hoverTimeLabel.Text = $"{(int)t.TotalHours:00}:{t.Minutes:00}";
+            Canvas.SetTop(_hoverTimeLabel, Math.Max(0, y - 8));
+            Canvas.SetLeft(_hoverTimeLabel, 0);
+        }
+    }
+
+    private void HideHoverGuide()
+    {
+        foreach (var line in _hoverGuideLines)
+            line.Visibility = Visibility.Collapsed;
+        if (_hoverTimeLabel is not null)
+            _hoverTimeLabel.Visibility = Visibility.Collapsed;
+    }
+
+    private void AddNotePinVisual(Canvas canvas, ScheduleNoteRow note, DateTime dayStart, double pxPerHour)
+    {
+        var pin = new Ellipse
+        {
+            Width = NotePinSize,
+            Height = NotePinSize,
+            Fill = Theme.Brush("AccentBrush"),
+            Stroke = Theme.Brush("WindowBackgroundBrush"),
+            StrokeThickness = 1.5,
+            Tag = "notePin",
+            DataContext = note,
+            Cursor = Cursors.Hand,
+            ToolTip = note.Body.Length > 80 ? note.Body[..80] + "…" : note.Body
+        };
+        Panel.SetZIndex(pin, 60);
+        var y = YFromDayTime(dayStart, note.At, pxPerHour);
+        Canvas.SetTop(pin, y - NotePinSize / 2);
+        var colW = Math.Max(40, canvas.ActualWidth > 0 ? canvas.ActualWidth : 80);
+        Canvas.SetLeft(pin, note.DayColumnPercent * colW - NotePinSize / 2);
+        pin.MouseLeftButtonDown += async (_, e) =>
+        {
+            e.Handled = true;
+            CloseNotePopup();
+            if (e.ClickCount >= 2)
+            {
+                await EditNotePinAsync(note);
+                return;
+            }
+            ShowNotePopup(pin, note);
+        };
+        canvas.Children.Add(pin);
+    }
+
+    private void ShowNotePopup(FrameworkElement anchor, ScheduleNoteRow note)
+    {
+        CloseNotePopup();
+        var border = new Border
+        {
+            Background = Theme.Brush("SurfaceBackgroundBrush"),
+            BorderBrush = Theme.Brush("BorderSubtleBrush"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(10),
+            CornerRadius = new CornerRadius(4),
+            MaxWidth = 280,
+            Child = new TextBlock
+            {
+                Text = note.Body,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Theme.Brush("TextPrimaryBrush")
+            }
+        };
+        _notePopup = new System.Windows.Controls.Primitives.Popup
+        {
+            Child = border,
+            PlacementTarget = anchor,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            StaysOpen = false,
+            AllowsTransparency = true
+        };
+        _openNoteId = note.Id;
+        _notePopup.Closed += (_, _) =>
+        {
+            if (_openNoteId == note.Id)
+            {
+                _openNoteId = null;
+                _notePopup = null;
+            }
+        };
+        _notePopup.IsOpen = true;
+    }
+
+    private void CloseNotePopup()
+    {
+        if (_notePopup is not null)
+            _notePopup.IsOpen = false;
+        _notePopup = null;
+        _openNoteId = null;
+    }
+
+    private static string NoteTitleFromBody(string body)
+    {
+        var t = body.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (t.Length == 0) return "笔记钉";
+        return t.Length <= 40 ? t : t[..40] + "…";
+    }
+
+    private async Task AddNotePinAtPendingAsync()
+    {
+        var dlg = new NotePinEditWindow(_pendingNoteAt, _pendingNotePercent) { Owner = _host.OwnerWindow };
+        if (dlg.ShowDialog() != true || dlg.DeleteRequested) return;
+        try
+        {
+            await _host.Session.Business.CreateRecordAsync(StoreTables.ScheduleNotes, new Dictionary<string, object?>
+            {
+                ["Title"] = NoteTitleFromBody(dlg.Body),
+                ["At"] = RewardLogic.FormatDateTime(_pendingNoteAt),
+                ["DayColumnPercent"] = _pendingNotePercent,
+                ["Body"] = dlg.Body,
+                ["CreatedAt"] = RewardLogic.FormatDateTime(DateTime.Now)
+            });
+            await LoadWeekAsync();
+            _host.StatusText = "已添加笔记钉";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "添加笔记钉失败");
+        }
+    }
+
+    private async Task EditNotePinAsync(ScheduleNoteRow note)
+    {
+        var dlg = new NotePinEditWindow(note.At, note.DayColumnPercent, note.Body, isEdit: true)
+        {
+            Owner = _host.OwnerWindow
+        };
+        if (dlg.ShowDialog() != true) return;
+        try
+        {
+            if (dlg.DeleteRequested)
+            {
+                await _host.Session.Business.DeleteRecordAsync(StoreTables.ScheduleNotes, note.Id);
+                await LoadWeekAsync();
+                _host.StatusText = "已删除笔记钉";
+                return;
+            }
+            await _host.Session.Business.PatchRecordAsync(StoreTables.ScheduleNotes, new Dictionary<string, object?>
+            {
+                ["Id"] = note.Id,
+                ["Title"] = NoteTitleFromBody(dlg.Body),
+                ["Body"] = dlg.Body
+            });
+            await LoadWeekAsync();
+            _host.StatusText = "已更新笔记钉";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "笔记钉保存失败");
+        }
     }
 
     private async Task MarkSelectionAsTaskAsync(TaskRow task)

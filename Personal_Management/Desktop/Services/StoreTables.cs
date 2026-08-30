@@ -7,6 +7,7 @@ internal static class StoreTables
     public const string Tasks = "tasks";
     public const string Completions = "completions";
     public const string Sessions = "sessions";
+    public const string ScheduleNotes = "schedule_notes";
     public const string Rewards = "reward_pool";
     public const string Wishlist = "wishlist";
     public const string State = "app_state";
@@ -16,7 +17,7 @@ internal static class StoreTables
 
     public static readonly string[] BusinessTables =
     [
-        Tasks, Completions, Sessions, Rewards, Wishlist, State
+        Tasks, Completions, Sessions, ScheduleNotes, Rewards, Wishlist, State
     ];
 
     public static readonly string[] FavoriteTables =

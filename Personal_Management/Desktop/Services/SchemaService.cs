@@ -41,6 +41,17 @@ internal static class SchemaService
         await noco.EnsureColumnAsync(sessions, Col("Outcome", "SingleLineText"));
         await noco.EnsureColumnAsync(sessions, Col("PausedSeconds", "Number"));
         await noco.EnsureColumnAsync(sessions, Col("PauseJson", "LongText"));
+        var scheduleNotes = await noco.EnsureTableAsync(baseId, "schedule_notes",
+        [
+            Col("At", "DateTime"),
+            Col("DayColumnPercent", "Number"),
+            Col("Body", "LongText"),
+            Col("CreatedAt", "DateTime")
+        ]);
+        await noco.EnsureColumnAsync(scheduleNotes, Col("At", "DateTime"));
+        await noco.EnsureColumnAsync(scheduleNotes, Col("DayColumnPercent", "Number"));
+        await noco.EnsureColumnAsync(scheduleNotes, Col("Body", "LongText"));
+        await noco.EnsureColumnAsync(scheduleNotes, Col("CreatedAt", "DateTime"));
         var rewards = await noco.EnsureTableAsync(baseId, "reward_pool",
         [
             Col("Kind", "SingleLineText"),
@@ -153,6 +164,7 @@ internal static class SchemaService
             Tasks = tasks,
             Completions = completions,
             Sessions = sessions,
+            ScheduleNotes = scheduleNotes,
             Rewards = rewards,
             Wishlist = wishlist,
             State = state,

@@ -32,7 +32,7 @@
                                        MouseLeftButtonUp="ScheduleWallet_Click"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        Text="当前奖券数量：0 · 愿望单额度：0"/>
-                            <TextBlock Text="拖入图片或 Ctrl+V 新建 · 长按列内拖选补记 · F1 聚焦 · F5 刷新"
+                            <TextBlock Text="拖入图片或 Ctrl+V 新建 · 长按列内拖选补记 · 右键笔记钉 · F1 聚焦 · F5 刷新"
                                        VerticalAlignment="Center" Margin="8,0,8,4"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </WrapPanel>

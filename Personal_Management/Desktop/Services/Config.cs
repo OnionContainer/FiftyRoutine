@@ -82,6 +82,7 @@ public sealed class SchemaIds
     public required string Tasks { get; init; }
     public required string Completions { get; init; }
     public required string Sessions { get; init; }
+    public required string ScheduleNotes { get; init; }
     public required string Rewards { get; init; }
     public required string Wishlist { get; init; }
     public required string State { get; init; }

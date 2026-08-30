@@ -39,6 +39,7 @@ internal sealed class NocoRecordStore : IRecordStore
         StoreTables.Tasks => _schema.Tasks,
         StoreTables.Completions => _schema.Completions,
         StoreTables.Sessions => _schema.Sessions,
+        StoreTables.ScheduleNotes => _schema.ScheduleNotes,
         StoreTables.Rewards => _schema.Rewards,
         StoreTables.Wishlist => _schema.Wishlist,
         StoreTables.State => _schema.State,

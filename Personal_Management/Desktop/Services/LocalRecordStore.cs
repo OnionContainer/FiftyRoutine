@@ -29,6 +29,7 @@ internal sealed class LocalRecordStore : IRecordStore
             EnsureTableFile(StoreTables.Tasks);
             EnsureTableFile(StoreTables.Completions);
             EnsureTableFile(StoreTables.Sessions);
+            EnsureTableFile(StoreTables.ScheduleNotes);
             EnsureTableFile(StoreTables.Rewards);
             EnsureTableFile(StoreTables.Wishlist);
             EnsureTableFile(StoreTables.State);

@@ -47,6 +47,7 @@ internal static class DataMigrator
         // Order: clear dependent → tasks → linked → rest
         await ClearTableAsync(noco, StoreTables.Completions, log);
         await ClearTableAsync(noco, StoreTables.Sessions, log);
+        await ClearTableAsync(noco, StoreTables.ScheduleNotes, log);
         await ClearTableAsync(noco, StoreTables.Tasks, log);
         await ClearTableAsync(noco, StoreTables.Rewards, log);
         await ClearTableAsync(noco, StoreTables.Wishlist, log);
@@ -78,6 +79,14 @@ internal static class DataMigrator
             if (row is null) continue;
             var fields = await MaterializeAsync(local, noco, row, preserveId: false, idMap);
             await noco.CreateRecordAsync(StoreTables.Sessions, fields);
+        }
+
+        log?.Invoke("上传 schedule_notes…");
+        foreach (var row in await local.ListRecordsAsync(StoreTables.ScheduleNotes))
+        {
+            if (row is null) continue;
+            var fields = await MaterializeAsync(local, noco, row, preserveId: false, idMap: null);
+            await noco.CreateRecordAsync(StoreTables.ScheduleNotes, fields);
         }
 
         log?.Invoke("上传 reward_pool…");
