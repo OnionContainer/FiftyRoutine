@@ -64,10 +64,7 @@ public partial class RewardWishWindow : Window
 
     private void UpdateOfflineOverlay()
     {
-        var show = !_session.BusinessReady;
-        OfflineOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        ContentRoot.IsEnabled = !show;
-        ContentRoot.Opacity = show ? 0.35 : 1;
+        OfflineOverlayHost.SetActive(ContentRoot, !_session.BusinessReady);
     }
 
     private async void TryConnectNoco_Click(object sender, RoutedEventArgs e)
@@ -238,14 +235,6 @@ public partial class RewardWishWindow : Window
         RenderWishCards();
     }
 
-    private TextBlock HintBlock(string text) => new()
-    {
-        Text = text,
-        Margin = new Thickness(8),
-        Foreground = Theme.Brush("TextSecondaryBrush"),
-        TextWrapping = TextWrapping.Wrap
-    };
-
     private void RenderRewardCards()
     {
         RewardWrap.Children.Clear();
@@ -255,7 +244,7 @@ public partial class RewardWishWindow : Window
             var hint = _rewards.Count == 0
                 ? "奖池是空的。"
                 : "没有可显示的奖励。勾选「显示已归档内容」可查看已归档项。";
-            RewardWrap.Children.Add(HintBlock(hint));
+            RewardWrap.Children.Add(ThumbCard.Hint(hint));
             return;
         }
         foreach (var row in visible)
@@ -292,7 +281,7 @@ public partial class RewardWishWindow : Window
             var hint = _wishes.Count == 0
                 ? "还没有愿望。点「添加」。"
                 : "没有可显示的愿望。勾选「显示已归档内容」可查看已归档项。";
-            WishWrap.Children.Add(HintBlock(hint));
+            WishWrap.Children.Add(ThumbCard.Hint(hint));
             return;
         }
         foreach (var row in visible)
@@ -314,75 +303,34 @@ public partial class RewardWishWindow : Window
         string info, bool archived, Action onSelect, Func<Task> onEdit)
     {
         var t = Theme.Current;
-        var w = t.CardWidth;
-        var thumbH = t.CardThumbHeight;
-        UIElement thumbChild;
-        if (preview is not null)
-        {
-            thumbChild = new System.Windows.Controls.Image
-            {
-                Height = thumbH,
-                Stretch = Stretch.UniformToFill,
-                Source = preview
-            };
-        }
-        else
-        {
-            thumbChild = new TextBlock
+        UIElement? placeholderEl = preview is null
+            ? new TextBlock
             {
                 Text = placeholder,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = Theme.Brush("TextSecondaryBrush")
-            };
-        }
-        var thumbRadius = Math.Max(0, t.CardCornerRadius - 2);
-        var icon = new Border
+            }
+            : null;
+        var accent = TaskVisual.ParseColor(Theme.Current.Accent);
+        return ThumbCard.Build(new ThumbCard.Options
         {
-            Height = thumbH,
-            Background = preview is null
-                ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(50,
-                    TaskVisual.ParseColor(Theme.Current.Accent).R,
-                    TaskVisual.ParseColor(Theme.Current.Accent).G,
-                    TaskVisual.ParseColor(Theme.Current.Accent).B))
-                : Brushes.Transparent,
-            Child = thumbChild,
-            CornerRadius = new CornerRadius(thumbRadius),
-            ClipToBounds = true
-        };
-        UiShapes.RoundClip(icon, thumbRadius);
-        var infoBlock = new TextBlock
-        {
-            Text = info,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 8, 0, 0),
-            Foreground = Theme.Brush("TextPrimaryBrush"),
-            FontSize = t.FontSizeBody
-        };
-        var stack = new StackPanel();
-        stack.Children.Add(icon);
-        stack.Children.Add(infoBlock);
-        var border = new Border
-        {
-            Width = w,
+            Width = t.CardWidth,
             Height = t.CardHeight,
-            Margin = new Thickness(6),
-            Padding = new Thickness(10),
-            Background = Theme.Brush("SurfaceBackgroundBrush"),
+            ThumbHeight = t.CardThumbHeight,
+            CornerRadius = t.CardCornerRadius,
+            Preview = preview,
+            Placeholder = placeholderEl,
+            ThumbBackground = preview is null
+                ? new SolidColorBrush(Color.FromArgb(50, accent.R, accent.G, accent.B))
+                : Brushes.Transparent,
+            Caption = info,
             BorderBrush = selected ? Theme.Brush("AccentBrush") : Theme.Brush("BorderSubtleBrush"),
-            BorderThickness = new Thickness(selected ? 3 : 1),
-            CornerRadius = new CornerRadius(t.CardCornerRadius),
-            Cursor = Cursors.Hand,
+            BorderThickness = selected ? 3 : 1,
             Opacity = archived ? 0.55 : 1,
-            Child = stack
-        };
-        border.MouseLeftButtonDown += async (_, e) =>
-        {
-            onSelect();
-            if (e.ClickCount == 2)
-                await onEdit();
-        };
-        return border;
+            OnSelect = onSelect,
+            OnDoubleClick = onEdit
+        });
     }
 
     private async Task<string?> DownloadAttachmentTempAsync(IRecordStore store, JsonNode? field, string prefix)

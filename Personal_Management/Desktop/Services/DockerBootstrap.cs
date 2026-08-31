@@ -43,7 +43,7 @@ internal static class DockerBootstrap
             await Task.Delay(2000);
         }
 
-        throw new InvalidOperationException("已尝试启动 Docker，但 http://localhost:8080 仍无响应。");
+        throw new InvalidOperationException("已尝试启动 Docker，但 " + baseUrl + " 仍无响应。");
     }
 
     public static async Task<bool> PingAsync(string baseUrl)

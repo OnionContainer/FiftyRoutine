@@ -1,6 +1,7 @@
 <UserControl x:Class="PersonalManagement.Desktop.FavoritesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PersonalManagement.Desktop">
             <Grid>
                 <DockPanel x:Name="FavDock" AllowDrop="True" Background="Transparent"
                            PreviewDragOver="FavDock_PreviewDragOver"
@@ -21,13 +22,6 @@
                         <WrapPanel x:Name="FavWrap" Margin="8"/>
                     </ScrollViewer>
                 </DockPanel>
-                <Border x:Name="FavOfflineOverlay" Visibility="Collapsed" Background="#CCFFFFFF" Panel.ZIndex="20">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420">
-                        <TextBlock Text="NocoDB未连接，请配置NocoDB或将此页面功能设为不依赖NocoDB后重试"
-                                   TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,12"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        <Button Content="尝试连接 NocoDB" HorizontalAlignment="Center" Click="TryConnectNoco_Click"/>
-                    </StackPanel>
-                </Border>
+                <local:OfflineOverlay x:Name="FavOfflineOverlay" ConnectClick="TryConnectNoco_Click"/>
             </Grid>
 </UserControl>

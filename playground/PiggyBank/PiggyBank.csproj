@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Playground.PiggyBank</RootNamespace>
+    <AssemblyName>PiggyBank</AssemblyName>
+    <ApplicationTitle>存钱罐金币测试</ApplicationTitle>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aether.Physics2D" Version="2.2.0" />
+  </ItemGroup>
+</Project>

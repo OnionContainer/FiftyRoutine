@@ -486,19 +486,9 @@ public partial class WeightPage : UserControl
         });
     }
 
-    private static void SetOfflineOverlay(UIElement? overlay, UIElement? content, bool show)
-    {
-        if (overlay is null || content is null) return;
-        overlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        content.IsEnabled = !show;
-        content.Opacity = show ? 0.35 : 1;
-    }
-
-
-
     public void UpdateOfflineOverlay()
     {
-        SetOfflineOverlay(WeightOfflineOverlay, WeightDock, !_host.Session.WeightReady);
+        WeightOfflineOverlay.SetActive(WeightDock, !_host.Session.WeightReady);
     }
 
     public async Task ReloadAsync() => await LoadWeightAsync();

@@ -94,70 +94,37 @@ public partial class FavoritesPage : UserControl
             var hint = _favs.Count == 0
                 ? "把图片拖进来，或按 Ctrl+V 粘贴。"
                 : "没有符合筛选的收藏。";
-            FavWrap.Children.Add(HintBlock(hint));
+            FavWrap.Children.Add(ThumbCard.Hint(hint));
         }
     }
 
     private UIElement CreateFavCard(FavoriteItem item)
     {
         var t = Theme.Current;
-        var w = t.FavCardWidth;
-        var thumbH = t.FavCardThumbHeight;
-        var image = new System.Windows.Controls.Image
+        var check = new CheckBox
         {
-            Height = thumbH,
-            Stretch = Stretch.UniformToFill,
-            Source = item.Preview
+            IsChecked = item.Selected,
+            Margin = new Thickness(4),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
         };
-        var check = new CheckBox { IsChecked = item.Selected, Margin = new Thickness(4), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
         check.Checked += (_, _) => item.Selected = true;
         check.Unchecked += (_, _) => item.Selected = false;
-        var thumb = new Grid { Height = thumbH };
-        var thumbRadius = Math.Max(0, t.CardCornerRadius - 2);
-        var thumbBorder = new Border
+        return ThumbCard.Build(new ThumbCard.Options
         {
-            Height = thumbH,
-            Background = item.Preview is null ? Theme.Brush("SurfaceBackgroundBrush") : Brushes.Transparent,
-            Child = image,
-            ClipToBounds = true,
-            CornerRadius = new CornerRadius(thumbRadius)
-        };
-        UiShapes.RoundClip(thumbBorder, thumbRadius);
-        thumb.Children.Add(thumbBorder);
-        thumb.Children.Add(check);
-        var caption = new TextBlock
-        {
-            Text = item.Title,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap,
-            Foreground = Theme.Brush("TextPrimaryBrush"),
-            FontSize = t.FontSizeBody,
-            Margin = new Thickness(0, 8, 0, 0),
-            ToolTip = item.KindLabel + (string.IsNullOrWhiteSpace(item.Source) ? "" : "\n" + item.Source)
-        };
-        var stack = new StackPanel();
-        stack.Children.Add(thumb);
-        stack.Children.Add(caption);
-        var border = new Border
-        {
-            Width = w,
+            Width = t.FavCardWidth,
             Height = t.FavCardHeight,
-            Margin = new Thickness(6),
-            Padding = new Thickness(10),
-            Background = Theme.Brush("SurfaceBackgroundBrush"),
-            BorderBrush = Theme.Brush("BorderSubtleBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(t.CardCornerRadius),
-            Child = stack,
-            Cursor = Cursors.Hand,
-            Tag = item
-        };
-        border.MouseLeftButtonDown += async (_, e) =>
-        {
-            if (e.ClickCount == 2)
-                await EditFavoriteAsync(item);
-        };
-        return border;
+            ThumbHeight = t.FavCardThumbHeight,
+            CornerRadius = t.CardCornerRadius,
+            Preview = item.Preview,
+            ThumbOverlay = check,
+            Caption = item.Title,
+            CaptionWrapping = TextWrapping.NoWrap,
+            CaptionTrimming = TextTrimming.CharacterEllipsis,
+            CaptionToolTip = item.KindLabel + (string.IsNullOrWhiteSpace(item.Source) ? "" : "\n" + item.Source),
+            Tag = item,
+            OnDoubleClick = () => EditFavoriteAsync(item)
+        });
     }
 
     private List<FavoriteItem> SelectedFavorites() => _favs.Where(f => f.Selected).ToList();
@@ -546,19 +513,9 @@ public partial class FavoritesPage : UserControl
         ".mkv" => "video/x-matroska",
         _ => "application/octet-stream"
     };
-    private static void SetOfflineOverlay(UIElement? overlay, UIElement? content, bool show)
-    {
-        if (overlay is null || content is null) return;
-        overlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        content.IsEnabled = !show;
-        content.Opacity = show ? 0.35 : 1;
-    }
-
-
-
     public void UpdateOfflineOverlay()
     {
-        SetOfflineOverlay(FavOfflineOverlay, FavDock, !_host.Session.FavoritesReady);
+        FavOfflineOverlay.SetActive(FavDock, !_host.Session.FavoritesReady);
     }
 
     public async Task ReloadAsync() => await LoadFavoritesAsync();
@@ -575,14 +532,6 @@ public partial class FavoritesPage : UserControl
 
     private async void TryConnectNoco_Click(object sender, RoutedEventArgs e) =>
         await _host.TryConnectNocoAsync();
-
-    private TextBlock HintBlock(string text) => new()
-    {
-        Text = text,
-        Margin = new Thickness(8),
-        Foreground = Theme.Brush("TextSecondaryBrush"),
-        TextWrapping = TextWrapping.Wrap
-    };
 
     private async Task<object> UploadFileAsync(string path) =>
         await _host.Session.Favorites.UploadAsync(System.IO.Path.GetFileName(path), await File.ReadAllBytesAsync(path), MimeOf(path));
