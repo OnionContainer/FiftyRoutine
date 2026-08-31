@@ -20,10 +20,8 @@ FiftyRoutine-pre-filter.bundle
 Painting_API_Study/
 painting_api_study.md
 
-# --- Published package: keep only .zip archives in git ---
-FiftyRoutineRelease/**
-!FiftyRoutineRelease/**/
-!FiftyRoutineRelease/**/*.zip
+# --- Local release packaging (publish via gh release, not git) ---
+FiftyRoutineRelease/
 
 Personal_Management/local/
 Personal_Management/storage.json
