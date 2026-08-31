@@ -7,6 +7,10 @@ password.md
 *.key
 credentials.json
 **/appsettings.*.local.json
+WechatBot/botinfo.py
+
+# --- Local NocoDB Docker volume (lives outside the repo) ---
+nocodb-data/
 
 # --- Local experiments (not part of the product repo) ---
 Painting_API_Study/
@@ -27,6 +31,7 @@ Personal_Management/Desktop/Assets/user/
 # --- App / playground local state ---
 playground/last-settings.json
 playground/**/last-settings.json
+playground/**/piggybank-settings.json
 *.pmimg
 
 # --- .NET build ---
