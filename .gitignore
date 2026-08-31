@@ -53,6 +53,7 @@ TestResults/
 *.snupkg
 
 # --- IDE / OS ---
+.cursor/
 .vs/
 .vscode/*
 !.vscode/extensions.json
@@ -69,3 +70,4 @@ ehthumbs.db
 *.tmp
 *.temp
 *.log
+Personal_Management/Probes/last-probe-result.md
